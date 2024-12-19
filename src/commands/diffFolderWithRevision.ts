@@ -1,11 +1,11 @@
 import type { TextDocumentShowOptions, TextEditor } from 'vscode';
 import { FileType, Uri, workspace } from 'vscode';
 import { GlyphChars } from '../constants';
-import { Commands } from '../constants.commands';
+import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import { openFolderCompare } from '../git/actions/commit';
 import { GitUri } from '../git/gitUri';
-import { shortenRevision } from '../git/models/reference';
+import { shortenRevision } from '../git/models/revision.utils';
 import { showGenericErrorMessage } from '../messages';
 import { showCommitPicker } from '../quickpicks/commitPicker';
 import { CommandQuickPickItem } from '../quickpicks/items/common';
@@ -25,7 +25,7 @@ export interface DiffFolderWithRevisionCommandArgs {
 @command()
 export class DiffFolderWithRevisionCommand extends ActiveEditorCommand {
 	constructor(private readonly container: Container) {
-		super(Commands.DiffFolderWithRevision);
+		super(GlCommand.DiffFolderWithRevision);
 	}
 
 	async execute(editor?: TextEditor, uri?: Uri, args?: DiffFolderWithRevisionCommandArgs): Promise<any> {
@@ -64,7 +64,7 @@ export class DiffFolderWithRevisionCommand extends ActiveEditorCommand {
 			const pick = await showCommitPicker(log, title, 'Choose a commit to compare with', {
 				picked: gitUri.sha,
 				showOtherReferences: [
-					CommandQuickPickItem.fromCommand('Choose a Branch or Tag...', Commands.DiffFolderWithRevisionFrom),
+					CommandQuickPickItem.fromCommand('Choose a Branch or Tag...', GlCommand.DiffFolderWithRevisionFrom),
 				],
 			});
 			if (pick == null) return;

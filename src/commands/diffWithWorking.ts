@@ -1,10 +1,10 @@
 import type { TextDocumentShowOptions, TextEditor, Uri } from 'vscode';
 import { window } from 'vscode';
-import { Commands } from '../constants.commands';
+import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import { GitUri } from '../git/gitUri';
-import { deletedOrMissing, uncommittedStaged } from '../git/models/constants';
-import { createReference } from '../git/models/reference';
+import { createReference } from '../git/models/reference.utils';
+import { deletedOrMissing, uncommittedStaged } from '../git/models/revision';
 import { showGenericErrorMessage } from '../messages';
 import { showRevisionFilesPicker } from '../quickpicks/revisionFilesPicker';
 import { Logger } from '../system/logger';
@@ -24,7 +24,7 @@ export interface DiffWithWorkingCommandArgs {
 @command()
 export class DiffWithWorkingCommand extends ActiveEditorCommand {
 	constructor(private readonly container: Container) {
-		super([Commands.DiffWithWorking, Commands.DiffWithWorkingInDiffLeft, Commands.DiffWithWorkingInDiffRight]);
+		super([GlCommand.DiffWithWorking, GlCommand.DiffWithWorkingInDiffLeft, GlCommand.DiffWithWorkingInDiffRight]);
 	}
 
 	async execute(editor?: TextEditor, uri?: Uri, args?: DiffWithWorkingCommandArgs): Promise<any> {
@@ -78,7 +78,7 @@ export class DiffWithWorkingCommand extends ActiveEditorCommand {
 		if (gitUri.isUncommittedStaged) {
 			const status = await this.container.git.getStatusForFile(gitUri.repoPath!, gitUri);
 			if (status?.indexStatus != null) {
-				void (await executeCommand<DiffWithCommandArgs>(Commands.DiffWith, {
+				void (await executeCommand<DiffWithCommandArgs>(GlCommand.DiffWith, {
 					repoPath: gitUri.repoPath,
 					lhs: {
 						sha: uncommittedStaged,
@@ -117,7 +117,7 @@ export class DiffWithWorkingCommand extends ActiveEditorCommand {
 			workingUri = pickedUri;
 		}
 
-		void (await executeCommand<DiffWithCommandArgs>(Commands.DiffWith, {
+		void (await executeCommand<DiffWithCommandArgs>(GlCommand.DiffWith, {
 			repoPath: gitUri.repoPath,
 			lhs: {
 				sha: gitUri.sha,

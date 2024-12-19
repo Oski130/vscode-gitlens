@@ -3,20 +3,20 @@ import { ThemeIcon } from 'vscode';
 import type { GitWizardCommandArgs } from '../../commands/gitWizard';
 import { getSteps } from '../../commands/quickWizard.utils';
 import { GlyphChars } from '../../constants';
-import { Commands } from '../../constants.commands';
+import { GlCommand } from '../../constants.commands';
 import { Container } from '../../container';
 import { emojify } from '../../emojis';
 import type { GitBranch } from '../../git/models/branch';
 import type { GitCommit, GitStashCommit } from '../../git/models/commit';
 import { isStash } from '../../git/models/commit';
 import type { GitReference } from '../../git/models/reference';
-import { createReference, isRevisionRange, shortenRevision } from '../../git/models/reference';
+import { createReference } from '../../git/models/reference.utils';
 import type { GitRemote } from '../../git/models/remote';
 import { getRemoteUpstreamDescription } from '../../git/models/remote';
 import type { Repository } from '../../git/models/repository';
+import { isRevisionRange , shortenRevision } from '../../git/models/revision.utils';
 import type { GitTag } from '../../git/models/tag';
-import { getBranchIconPath } from '../../git/utils/branch-utils';
-import { getWorktreeBranchIconPath } from '../../git/utils/worktree-utils';
+import { getBranchIconPath, getWorktreeBranchIconPath } from '../../git/utils/icons';
 import { fromNow } from '../../system/date';
 import { pad } from '../../system/string';
 import { configuration } from '../../system/vscode/configuration';
@@ -27,7 +27,7 @@ export class GitWizardQuickPickItem extends CommandQuickPickItem<[GitWizardComma
 	constructor(label: string, args: GitWizardCommandArgs);
 	constructor(item: QuickPickItem, args: GitWizardCommandArgs);
 	constructor(labelOrItem: string | QuickPickItem, args: GitWizardCommandArgs) {
-		super(labelOrItem, undefined, Commands.GitCommands, [args], { suppressKeyPress: true });
+		super(labelOrItem, undefined, GlCommand.GitCommands, [args], { suppressKeyPress: true });
 	}
 
 	executeSteps(pickedVia: 'menu' | 'command') {

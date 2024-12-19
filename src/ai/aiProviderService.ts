@@ -6,10 +6,10 @@ import type { Container } from '../container';
 import { CancellationError } from '../errors';
 import type { GitCommit } from '../git/models/commit';
 import { assertsCommitHasFullDetails, isCommit } from '../git/models/commit';
-import { uncommitted, uncommittedStaged } from '../git/models/constants';
 import type { GitRevisionReference } from '../git/models/reference';
 import type { Repository } from '../git/models/repository';
 import { isRepository } from '../git/models/repository';
+import { uncommitted, uncommittedStaged } from '../git/models/revision';
 import { showAIModelPicker } from '../quickpicks/aiModelPicker';
 import { getSettledValue } from '../system/promise';
 import { getPossessiveForm } from '../system/string';
@@ -555,7 +555,7 @@ async function confirmAIProviderToS<Provider extends AIProviders>(
 	const acceptAlways: MessageItem = { title: 'Always' };
 	const decline: MessageItem = { title: 'Cancel', isCloseAffordance: true };
 	const result = await window.showInformationMessage(
-		`GitLens experimental AI features require sending a diff of the code changes to ${model.provider.name} for analysis. This may contain sensitive information.\n\nDo you want to continue?`,
+		`GitLens AI features require sending a diff of the code changes to ${model.provider.name} for analysis. This may contain sensitive information.\n\nDo you want to continue?`,
 		{ modal: true },
 		accept,
 		acceptWorkspace,

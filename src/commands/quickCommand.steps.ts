@@ -1,7 +1,7 @@
 import type { QuickInputButton, QuickPick, QuickPickItem } from 'vscode';
 import { ThemeIcon } from 'vscode';
 import { GlyphChars, quickPickTitleMaxChars } from '../constants';
-import { Commands } from '../constants.commands';
+import { GlCommand } from '../constants.commands';
 import { Container } from '../container';
 import type { FeatureAccess, RepoFeatureAccess } from '../features';
 import { PlusFeatures } from '../features';
@@ -14,35 +14,37 @@ import * as StashActions from '../git/actions/stash';
 import * as TagActions from '../git/actions/tag';
 import * as WorktreeActions from '../git/actions/worktree';
 import type { PagedResult } from '../git/gitProvider';
-import type { BranchSortOptions, GitBranch } from '../git/models/branch';
-import { sortBranches } from '../git/models/branch';
+import type { GitBranch } from '../git/models/branch';
 import type { GitCommit, GitStashCommit } from '../git/models/commit';
 import { isCommit, isStash } from '../git/models/commit';
-import type { ContributorQuickPickItem, GitContributor } from '../git/models/contributor';
-import { createContributorQuickPickItem, sortContributors } from '../git/models/contributor';
+import type { GitContributor } from '../git/models/contributor';
+import type { ContributorQuickPickItem } from '../git/models/contributor.quickpick';
+import { createContributorQuickPickItem } from '../git/models/contributor.quickpick';
 import type { GitLog } from '../git/models/log';
 import type { GitBranchReference, GitReference, GitRevisionReference, GitTagReference } from '../git/models/reference';
 import {
 	createReference,
-	createRevisionRange,
 	getReferenceLabel,
 	isBranchReference,
-	isRevisionRange,
 	isRevisionReference,
 	isStashReference,
 	isTagReference,
-} from '../git/models/reference';
+} from '../git/models/reference.utils';
 import type { GitRemote } from '../git/models/remote';
 import { getHighlanderProviderName } from '../git/models/remote';
 import { RemoteResourceType } from '../git/models/remoteResource';
 import { Repository } from '../git/models/repository';
+import { createRevisionRange, isRevisionRange } from '../git/models/revision.utils';
 import type { GitStash } from '../git/models/stash';
 import type { GitStatus } from '../git/models/status';
-import type { GitTag, TagSortOptions } from '../git/models/tag';
-import { sortTags } from '../git/models/tag';
-import type { GitWorktree, WorktreeQuickPickItem } from '../git/models/worktree';
-import { createWorktreeQuickPickItem, getWorktreesByBranch, sortWorktrees } from '../git/models/worktree';
+import type { GitTag } from '../git/models/tag';
+import type { GitWorktree } from '../git/models/worktree';
+import type { WorktreeQuickPickItem } from '../git/models/worktree.quickpick';
+import { createWorktreeQuickPickItem } from '../git/models/worktree.quickpick';
+import { getWorktreesByBranch } from '../git/models/worktree.utils';
 import { remoteUrlRegex } from '../git/parsers/remoteParser';
+import type { BranchSortOptions, TagSortOptions } from '../git/utils/sorting';
+import { sortBranches, sortContributors, sortTags, sortWorktrees } from '../git/utils/sorting';
 import { getApplicablePromo } from '../plus/gk/account/promos';
 import { isSubscriptionPaidPlan, isSubscriptionPreviewTrialExpired } from '../plus/gk/account/subscription';
 import type { LaunchpadCommandArgs } from '../plus/launchpad/launchpad';
@@ -993,7 +995,7 @@ export function* pickBranchOrTagStepMultiRepo<
 		label: 'Choose a Pull Request...',
 		iconPath: new ThemeIcon('git-pull-request'),
 		alwaysShow: true,
-		item: createCrossCommandReference<Partial<LaunchpadCommandArgs>>(Commands.ShowLaunchpad, {
+		item: createCrossCommandReference<Partial<LaunchpadCommandArgs>>(GlCommand.ShowLaunchpad, {
 			source: 'quick-wizard',
 		}),
 	};
@@ -2622,7 +2624,9 @@ function getShowRepositoryStatusStepItems<
 	}
 
 	if (context.status.files.length) {
-		items.push(new CommandQuickPickItem('Close Unchanged Files', new ThemeIcon('x'), Commands.CloseUnchangedFiles));
+		items.push(
+			new CommandQuickPickItem('Close Unchanged Files', new ThemeIcon('x'), GlCommand.CloseUnchangedFiles),
+		);
 	}
 
 	return items;
@@ -2687,7 +2691,7 @@ export async function* ensureAccessStep<
 					detail: 'Click to learn more about Launchpad',
 					iconPath: new ThemeIcon('rocket'),
 					onDidSelect: () =>
-						void executeCommand<OpenWalkthroughCommandArgs>(Commands.OpenWalkthrough, {
+						void executeCommand<OpenWalkthroughCommandArgs>(GlCommand.OpenWalkthrough, {
 							step: 'accelerate-pr-reviews',
 							source: 'launchpad',
 							detail: 'info',

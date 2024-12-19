@@ -8,13 +8,15 @@ import type { CreatePullRequestOnRemoteCommandArgs } from './commands/createPull
 import type { OpenPullRequestOnRemoteCommandArgs } from './commands/openPullRequestOnRemote';
 import { fromOutputLevel } from './config';
 import { trackableSchemes } from './constants';
-import { Commands } from './constants.commands';
+import { GlCommand } from './constants.commands';
 import { SyncedStorageKeys } from './constants.storage';
 import { Container } from './container';
 import { isGitUri } from './git/gitUri';
-import { getBranchNameWithoutRemote, isBranch } from './git/models/branch';
+import { isBranch } from './git/models/branch';
+import { getBranchNameWithoutRemote } from './git/models/branch.utils';
 import { isCommit } from './git/models/commit';
 import { isRepository } from './git/models/repository';
+import { setAbbreviatedShaLength } from './git/models/revision.utils';
 import { isTag } from './git/models/tag';
 import { showDebugLoggingWarningMessage, showPreReleaseExpiredErrorMessage, showWhatsNewMessage } from './messages';
 import { registerPartnerActionRunners } from './partners';
@@ -56,7 +58,7 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 						})`,
 					);
 					channel.appendLine(
-						'To enable debug logging, set `"gitlens.outputLevel: "debug"` or run "GitLens: Enable Debug Logging" from the Command Palette',
+						'To enable debug logging, set `"gitlens.outputLevel": "debug"` or run "GitLens: Enable Debug Logging" from the Command Palette',
 					);
 				}
 				return channel;
@@ -167,6 +169,10 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 			if (configuration.changed(e, 'defaultDateLocale')) {
 				setDefaultDateLocales(configuration.get('defaultDateLocale') ?? env.language);
 			}
+
+			if (configuration.changed(e, 'advanced.abbreviatedShaLength')) {
+				setAbbreviatedShaLength(configuration.get('advanced.abbreviatedShaLength'));
+			}
 		}),
 	);
 
@@ -202,7 +208,7 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 
 				if (!container.prereleaseOrDebugging) {
 					if (await showDebugLoggingWarningMessage()) {
-						void executeCommand(Commands.DisableDebugLogging);
+						void executeCommand(GlCommand.DisableDebugLogging);
 					}
 				}
 			}, 60000);
@@ -292,7 +298,7 @@ function registerBuiltInActionRunners(container: Container): void {
 			run: async ctx => {
 				if (ctx.type !== 'createPullRequest') return;
 
-				void (await executeCommand<CreatePullRequestOnRemoteCommandArgs>(Commands.CreatePullRequestOnRemote, {
+				void (await executeCommand<CreatePullRequestOnRemoteCommandArgs>(GlCommand.CreatePullRequestOnRemote, {
 					base: undefined,
 					compare: ctx.branch.isRemote
 						? getBranchNameWithoutRemote(ctx.branch.name)
@@ -309,7 +315,7 @@ function registerBuiltInActionRunners(container: Container): void {
 			run: async ctx => {
 				if (ctx.type !== 'openPullRequest') return;
 
-				void (await executeCommand<OpenPullRequestOnRemoteCommandArgs>(Commands.OpenPullRequestOnRemote, {
+				void (await executeCommand<OpenPullRequestOnRemoteCommandArgs>(GlCommand.OpenPullRequestOnRemote, {
 					pr: { url: ctx.pullRequest.url },
 				}));
 			},

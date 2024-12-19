@@ -1,17 +1,18 @@
 import type { QuickPickItem } from 'vscode';
 import { Disposable, env, EventEmitter, ProgressLocation, Range, Uri, window, workspace } from 'vscode';
-import { Commands } from '../../constants.commands';
+import { GlCommand } from '../../constants.commands';
 import type { StoredDeepLinkContext, StoredNamedRef } from '../../constants.storage';
 import type { Container } from '../../container';
 import { executeGitCommand } from '../../git/actions';
 import { openComparisonChanges, openFileAtRevision } from '../../git/actions/commit';
 import type { GitBranch } from '../../git/models/branch';
-import { getBranchNameWithoutRemote } from '../../git/models/branch';
+import { getBranchNameWithoutRemote } from '../../git/models/branch.utils';
 import type { GitCommit } from '../../git/models/commit';
 import type { GitReference } from '../../git/models/reference';
-import { createReference, isSha } from '../../git/models/reference';
+import { createReference } from '../../git/models/reference.utils';
 import type { Repository, RepositoryChangeEvent } from '../../git/models/repository';
 import { RepositoryChange, RepositoryChangeComparisonMode } from '../../git/models/repository';
+import { isSha } from '../../git/models/revision.utils';
 import type { GitTag } from '../../git/models/tag';
 import { parseGitRemoteUrl } from '../../git/parsers/remoteParser';
 import type { RepositoryIdentity } from '../../gk/models/repositoryIdentities';
@@ -1123,7 +1124,7 @@ export class DeepLinkService implements Disposable {
 					}
 
 					if (targetType === DeepLinkType.Repository) {
-						void (await executeCommand(Commands.ShowInCommitGraph, repo));
+						void (await executeCommand(GlCommand.ShowInCommitGraph, repo));
 						action = DeepLinkServiceAction.DeepLinkResolved;
 						break;
 					}
@@ -1134,7 +1135,7 @@ export class DeepLinkService implements Disposable {
 						break;
 					}
 
-					void (await executeCommand<ShowInCommitGraphCommandArgs>(Commands.ShowInCommitGraph, {
+					void (await executeCommand<ShowInCommitGraphCommandArgs>(GlCommand.ShowInCommitGraph, {
 						ref: createReference(targetSha, repo.path),
 					}));
 
@@ -1182,7 +1183,7 @@ export class DeepLinkService implements Disposable {
 						prEntityId = fromBase64(prEntityId).toString();
 					}
 
-					void (await executeCommand(Commands.OpenCloudPatch, {
+					void (await executeCommand(GlCommand.OpenCloudPatch, {
 						type: type === 'suggested_pr_change' ? 'code_suggestion' : 'patch',
 						id: targetId,
 						patchId: secondaryTargetId,

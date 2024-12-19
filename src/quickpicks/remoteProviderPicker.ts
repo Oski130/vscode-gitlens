@@ -4,9 +4,13 @@ import type { OpenOnRemoteCommandArgs } from '../commands/openOnRemote';
 import { SetRemoteAsDefaultQuickInputButton } from '../commands/quickCommand.buttons';
 import type { Keys } from '../constants';
 import { GlyphChars } from '../constants';
-import { Commands } from '../constants.commands';
+import { GlCommand } from '../constants.commands';
 import { Container } from '../container';
-import { getBranchNameWithoutRemote, getDefaultBranchName, getRemoteNameFromBranchName } from '../git/models/branch';
+import {
+	getBranchNameWithoutRemote,
+	getDefaultBranchName,
+	getRemoteNameFromBranchName,
+} from '../git/models/branch.utils';
 import type { GitRemote } from '../git/models/remote';
 import { getHighlanderProviders } from '../git/models/remote';
 import type { RemoteResource } from '../git/models/remoteResource';
@@ -114,7 +118,7 @@ export class CopyRemoteResourceCommandQuickPickItem extends CommandQuickPickItem
 		const label = `Copy Link to ${getNameFromRemoteResource(resource)} for ${
 			providers?.length ? providers[0].name : 'Remote'
 		}${providers?.length === 1 ? '' : GlyphChars.Ellipsis}`;
-		super(label, new ThemeIcon('copy'), Commands.OpenOnRemote, [commandArgs]);
+		super(label, new ThemeIcon('copy'), GlCommand.OpenOnRemote, [commandArgs]);
 	}
 
 	override async onDidPressKey(key: Keys): Promise<void> {
@@ -138,7 +142,7 @@ export class OpenRemoteResourceCommandQuickPickItem extends CommandQuickPickItem
 					: `${providers?.length ? providers[0].name : 'Remote'}${GlyphChars.Ellipsis}`
 			}`,
 			new ThemeIcon('link-external'),
-			Commands.OpenOnRemote,
+			GlCommand.OpenOnRemote,
 			[commandArgs],
 		);
 	}

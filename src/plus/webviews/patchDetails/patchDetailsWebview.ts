@@ -2,7 +2,7 @@ import type { ConfigurationChangeEvent } from 'vscode';
 import { Disposable, env, Uri, window } from 'vscode';
 import { getAvatarUri } from '../../../avatars';
 import { GlyphChars, previewBadge } from '../../../constants';
-import { Commands } from '../../../constants.commands';
+import { GlCommand } from '../../../constants.commands';
 import type { ContextKeys } from '../../../constants.context';
 import type { Sources, WebviewTelemetryContext } from '../../../constants.telemetry';
 import type { Container } from '../../../container';
@@ -11,12 +11,13 @@ import { openChanges, openChangesWithWorking, openFile } from '../../../git/acti
 import { ApplyPatchCommitError, ApplyPatchCommitErrorReason } from '../../../git/errors';
 import type { RepositoriesChangeEvent } from '../../../git/gitProviderService';
 import type { GitCommit } from '../../../git/models/commit';
-import { uncommitted, uncommittedStaged } from '../../../git/models/constants';
 import { GitFileChange } from '../../../git/models/file';
 import type { PatchRevisionRange } from '../../../git/models/patch';
-import { createReference, shortenRevision } from '../../../git/models/reference';
+import { createReference } from '../../../git/models/reference.utils';
 import type { Repository } from '../../../git/models/repository';
 import { isRepository } from '../../../git/models/repository';
+import { uncommitted, uncommittedStaged } from '../../../git/models/revision';
+import { shortenRevision } from '../../../git/models/revision.utils';
 import type {
 	CreateDraftChange,
 	Draft,
@@ -134,7 +135,7 @@ export class PatchDetailsWebviewProvider
 
 	constructor(
 		private readonly container: Container,
-		private readonly host: WebviewHost,
+		private readonly host: WebviewHost<'gitlens.views.patchDetails' | 'gitlens.patchDetails'>,
 	) {
 		this._context = {
 			mode: 'create',
@@ -267,7 +268,7 @@ export class PatchDetailsWebviewProvider
 				break;
 
 			case OpenInCommitGraphCommand.is(e):
-				void executeCommand<ShowInCommitGraphCommandArgs>(Commands.ShowInCommitGraph, {
+				void executeCommand<ShowInCommitGraphCommandArgs>(GlCommand.ShowInCommitGraph, {
 					ref: createReference(e.params.ref, e.params.repoPath, { refType: 'revision' }),
 				});
 				break;

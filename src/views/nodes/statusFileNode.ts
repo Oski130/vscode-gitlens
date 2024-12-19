@@ -2,12 +2,12 @@ import type { Command } from 'vscode';
 import { MarkdownString, ThemeIcon, TreeItem, TreeItemCollapsibleState } from 'vscode';
 import type { DiffWithCommandArgs } from '../../commands/diffWith';
 import type { DiffWithPreviousCommandArgs } from '../../commands/diffWithPrevious';
-import { Commands } from '../../constants.commands';
+import { GlCommand } from '../../constants.commands';
 import { StatusFileFormatter } from '../../git/formatters/statusFormatter';
 import { GitUri } from '../../git/gitUri';
 import type { GitFileWithCommit } from '../../git/models/file';
 import { getGitFileStatusIcon, isGitFileChange } from '../../git/models/file';
-import { shortenRevision } from '../../git/models/reference';
+import { shortenRevision } from '../../git/models/revision.utils';
 import { joinPaths } from '../../system/path';
 import { relativeDir } from '../../system/vscode/path';
 import type { ViewsWithCommits } from '../viewBase';
@@ -215,7 +215,7 @@ export class StatusFileNode extends ViewFileNode<'status-file', ViewsWithCommits
 			};
 			return {
 				title: 'Open Changes with Previous Revision',
-				command: Commands.DiffWithPrevious,
+				command: GlCommand.DiffWithPrevious,
 				arguments: [undefined, commandArgs],
 			};
 		}
@@ -279,7 +279,7 @@ export class StatusFileNode extends ViewFileNode<'status-file', ViewsWithCommits
 
 		return {
 			title: 'Open Changes',
-			command: Commands.DiffWith,
+			command: GlCommand.DiffWith,
 			arguments: [commandArgs],
 		};
 	}

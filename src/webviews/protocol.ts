@@ -1,5 +1,6 @@
 import type { TimeInput } from '@opentelemetry/api';
 import type { Config } from '../config';
+import type { Commands } from '../constants.commands';
 import type { Source, TelemetryEvents, TelemetryEventsFromWebviewApp } from '../constants.telemetry';
 import type {
 	CustomEditorIds,
@@ -79,7 +80,7 @@ export interface WebviewFocusChangedParams {
 export const WebviewFocusChangedCommand = new IpcCommand<WebviewFocusChangedParams>('core', 'webview/focus/changed');
 
 export interface ExecuteCommandParams {
-	command: string;
+	command: Commands;
 	args?: [];
 }
 export const ExecuteCommand = new IpcCommand<ExecuteCommandParams>('core', 'command/execute');
@@ -104,6 +105,27 @@ export interface TelemetrySendEventParams<T extends keyof TelemetryEvents = keyo
 export const TelemetrySendEventCommand = new IpcCommand<TelemetrySendEventParams>('core', 'telemetry/sendEvent');
 
 // NOTIFICATIONS
+
+export interface IpcPromise {
+	__ipc: 'promise';
+	id: string;
+	method: string;
+}
+
+export function isIpcPromise(value: unknown): value is IpcPromise {
+	return (
+		value != null &&
+		typeof value === 'object' &&
+		'__ipc' in value &&
+		value.__ipc === 'promise' &&
+		'id' in value &&
+		typeof value.id === 'string' &&
+		'method' in value &&
+		typeof value.method === 'string'
+	);
+}
+
+export const ipcPromiseSettled = new IpcNotification<PromiseSettledResult<unknown>>('core', 'ipc/promise/settled');
 
 export interface DidChangeHostWindowFocusParams {
 	focused: boolean;

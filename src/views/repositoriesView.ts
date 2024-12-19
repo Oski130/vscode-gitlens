@@ -1,9 +1,9 @@
 import type { CancellationToken, ConfigurationChangeEvent, Disposable, Event } from 'vscode';
 import { EventEmitter, ProgressLocation, window } from 'vscode';
 import type { RepositoriesViewConfig, ViewBranchesLayout, ViewFilesLayout } from '../config';
-import { Commands } from '../constants.commands';
+import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
-import { getRemoteNameFromBranchName } from '../git/models/branch';
+import { getRemoteNameFromBranchName } from '../git/models/branch.utils';
 import type { GitCommit } from '../git/models/commit';
 import { isCommit } from '../git/models/commit';
 import type { GitContributor } from '../git/models/contributor';
@@ -13,7 +13,7 @@ import type {
 	GitStashReference,
 	GitTagReference,
 } from '../git/models/reference';
-import { getReferenceLabel } from '../git/models/reference';
+import { getReferenceLabel } from '../git/models/reference.utils';
 import type { GitRemote } from '../git/models/remote';
 import type { GitWorktree } from '../git/models/worktree';
 import { gate } from '../system/decorators/gate';
@@ -59,7 +59,7 @@ export class RepositoriesView extends ViewBase<'repositories', RepositoriesNode,
 		return [
 			registerViewCommand(
 				this.getQualifiedCommand('copy'),
-				() => executeCommand(Commands.ViewsCopy, this.activeSelection, this.selection),
+				() => executeCommand(GlCommand.ViewsCopy, this.activeSelection, this.selection),
 				this,
 			),
 			registerViewCommand(

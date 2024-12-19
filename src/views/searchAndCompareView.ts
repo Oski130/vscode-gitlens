@@ -1,13 +1,13 @@
 import type { ConfigurationChangeEvent, Disposable } from 'vscode';
 import { TreeItem, TreeItemCollapsibleState } from 'vscode';
 import type { SearchAndCompareViewConfig, ViewFilesLayout } from '../config';
-import { Commands } from '../constants.commands';
+import { GlCommand } from '../constants.commands';
 import type { SearchQuery } from '../constants.search';
 import type { StoredNamedRef, StoredSearchAndCompareItem } from '../constants.storage';
 import type { Container } from '../container';
 import { unknownGitUri } from '../git/gitUri';
 import type { GitLog } from '../git/models/log';
-import { getRevisionRangeParts, isRevisionRange, shortenRevision } from '../git/models/reference';
+import { getRevisionRangeParts, isRevisionRange , shortenRevision } from '../git/models/revision.utils';
 import { getSearchQuery } from '../git/search';
 import { ReferencesQuickPickIncludes, showReferencePicker } from '../quickpicks/referencePicker';
 import { getRepositoryOrShowPicker } from '../quickpicks/repositoryPicker';
@@ -289,7 +289,7 @@ export class SearchAndCompareView extends ViewBase<
 			registerViewCommand(this.getQualifiedCommand('clear'), () => void this.clear(), this),
 			registerViewCommand(
 				this.getQualifiedCommand('copy'),
-				() => executeCommand(Commands.ViewsCopy, this.activeSelection, this.selection),
+				() => executeCommand(GlCommand.ViewsCopy, this.activeSelection, this.selection),
 				this,
 			),
 			registerViewCommand(this.getQualifiedCommand('refresh'), () => this.refresh(true), this),

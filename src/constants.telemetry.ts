@@ -1,7 +1,7 @@
 import type { Config, GraphBranchesVisibility, GraphConfig } from './config';
 import type { WalkthroughSteps } from './constants';
 import type { AIModels, AIProviders } from './constants.ai';
-import type { Commands } from './constants.commands';
+import type { GlCommand } from './constants.commands';
 import type { IntegrationId, SupportedCloudIntegrationIds } from './constants.integrations';
 import type { SubscriptionState, SubscriptionStateString } from './constants.subscription';
 import type { CustomEditorTypes, TreeViewTypes, WebviewTypes, WebviewViewTypes } from './constants.views';
@@ -218,6 +218,23 @@ export interface TelemetryEvents extends WebviewShowAbortedEvents, WebviewShownE
 	/** Sent when the user chooses to manage integrations */
 	'startWork/action': StartWorkActionEvent;
 
+	/** Sent when the user opens Start Work; use `instance` to correlate an Associate Issue with Branch "session" */
+	'associateIssueWithBranch/open': StartWorkEventDataBase;
+	/** Sent when the launchpad is opened; use `instance` to correlate an Associate Issue with Branch "session" */
+	'associateIssueWithBranch/opened': StartWorkConnectedEventData;
+	/** Sent when the user takes an action on an issue */
+	'associateIssueWithBranch/issue/action': StartWorkIssueActionEvent;
+	/** Sent when the user chooses an issue to associate with the branch in the second step */
+	'associateIssueWithBranch/issue/chosen': StartWorkIssueChosenEvent;
+	/** Sent when the user reaches the "connect an integration" step of Associate Issue with Branch */
+	'associateIssueWithBranch/steps/connect': StartWorkConnectedEventData;
+	/** Sent when the user reaches the "choose an issue" step of Associate Issue with Branch */
+	'associateIssueWithBranch/steps/issue': StartWorkConnectedEventData;
+	/** Sent when the user chooses to connect an integration */
+	'associateIssueWithBranch/title/action': StartWorkTitleActionEvent;
+	/** Sent when the user chooses to manage integrations */
+	'associateIssueWithBranch/action': StartWorkActionEvent;
+
 	/** Sent when the subscription is loaded */
 	subscription: SubscriptionEventData;
 
@@ -404,7 +421,7 @@ interface CommandEventData {
 }
 
 interface GitCommandEventData {
-	command: Commands.GitCommands;
+	command: GlCommand.GitCommands;
 	'context.mode'?: string;
 	'context.submode'?: string;
 	webview?: string;
@@ -861,6 +878,7 @@ export type TrackingContext = 'graph' | 'launchpad' | 'visual_file_history' | 'w
 
 export type Sources =
 	| 'account'
+	| 'associateIssueWithBranch'
 	| 'code-suggest'
 	| 'cloud-patches'
 	| 'commandPalette'
@@ -884,6 +902,7 @@ export type Sources =
 	| 'trial-indicator'
 	| 'scm-input'
 	| 'subscription'
+	| 'view'
 	| 'walkthrough'
 	| 'whatsnew'
 	| 'worktrees';
@@ -903,10 +922,9 @@ export type TrackedUsage = {
 	lastUsedAt: number;
 };
 
-export type CommandExecutionTrackedFeatures = `command:${Commands}:executed`;
 export type TrackedUsageFeatures =
 	| `${WebviewTypes}Webview`
 	| `${TreeViewTypes | WebviewViewTypes}View`
 	| `${CustomEditorTypes}Editor`;
 export type WalkthroughUsageKeys = 'home:walkthrough:dismissed';
-export type TrackedUsageKeys = `${TrackedUsageFeatures}:shown` | CommandExecutionTrackedFeatures | WalkthroughUsageKeys;
+export type TrackedUsageKeys = `${TrackedUsageFeatures}:shown` | `command:${string}:executed` | WalkthroughUsageKeys;

@@ -1,6 +1,14 @@
+import type { IntegrationDescriptor } from '../../constants.integrations';
 import type { GitBranchStatus, GitTrackingState } from '../../git/models/branch';
+import type { Issue } from '../../git/models/issue';
+import type { GitMergeStatus } from '../../git/models/merge';
+import type { MergeConflict } from '../../git/models/mergeConflict';
+import type { GitRebaseStatus } from '../../git/models/rebase';
+import type { GitBranchReference } from '../../git/models/reference';
 import type { Subscription } from '../../plus/gk/account/subscription';
 import type { LaunchpadSummaryResult } from '../../plus/launchpad/launchpadIndicator';
+import type { LaunchpadItem } from '../../plus/launchpad/launchpadProvider';
+import type { LaunchpadGroup } from '../../plus/launchpad/models';
 import type { IpcScope, WebviewState } from '../protocol';
 import { IpcCommand, IpcNotification, IpcRequest } from '../protocol';
 
@@ -17,6 +25,7 @@ export interface State extends WebviewState {
 	previewCollapsed: boolean;
 	integrationBannerCollapsed: boolean;
 	hasAnyIntegrationConnected: boolean;
+	integrations: IntegrationState[];
 	avatar?: string;
 	organizationsCount?: number;
 	walkthroughProgress: {
@@ -27,6 +36,10 @@ export interface State extends WebviewState {
 	showWalkthroughProgress?: boolean;
 	previewEnabled: boolean;
 	newInstall: boolean;
+}
+
+export interface IntegrationState extends IntegrationDescriptor {
+	connected: boolean;
 }
 
 export type OverviewRecentThreshold = 'OneDay' | 'OneWeek' | 'OneMonth';
@@ -55,58 +68,133 @@ export interface GetOverviewRequest {
 }
 
 export interface GetOverviewBranch {
+	reference: GitBranchReference;
+
+	repoPath: string;
 	id: string;
 	name: string;
 	opened: boolean;
 	timestamp?: number;
 	state: GitTrackingState;
-	workingTreeState?: {
-		added: number;
-		changed: number;
-		deleted: number;
-	};
-	status: GitBranchStatus;
 	upstream: { name: string; missing: boolean } | undefined;
+	status: GitBranchStatus;
 
-	owner?: {
-		name: string;
-		email: string;
-		avatarUrl: string;
-		current: boolean;
-		timestamp?: number;
-		count: number;
-		stats?: {
-			files: number;
-			additions: number;
-			deletions: number;
-		};
-	};
-	contributors?: {
-		name: string;
-		email: string;
-		avatarUrl: string;
-		current: boolean;
-		timestamp?: number;
-		count: number;
-		stats?: {
-			files: number;
-			additions: number;
-			deletions: number;
-		};
-	}[];
-	pr?: {
-		id: string;
-		title: string;
-		state: string;
-		url: string;
-	};
-	autolinks?: {
-		id: string;
-		title: string;
-		url: string;
-		state: string;
-		hasIssue: boolean;
-	}[];
+	wip?: Promise<
+		| {
+				workingTreeState?: {
+					added: number;
+					changed: number;
+					deleted: number;
+				};
+				hasConflicts?: boolean;
+				conflictsCount?: number;
+				mergeStatus?: GitMergeStatus;
+				rebaseStatus?: GitRebaseStatus;
+		  }
+		| undefined
+	>;
+
+	mergeTarget?: Promise<
+		| {
+				repoPath: string;
+				name: string | undefined;
+				status?: GitTrackingState;
+				potentialConflicts?: MergeConflict;
+
+				targetBranch: string | undefined;
+				baseBranch: string | undefined;
+				defaultBranch: string | undefined;
+		  }
+		| undefined
+	>;
+
+	owner?: Promise<
+		| {
+				name: string;
+				email: string;
+				avatarUrl: string;
+				current: boolean;
+				timestamp?: number;
+				count: number;
+				stats?: {
+					files: number;
+					additions: number;
+					deletions: number;
+				};
+		  }
+		| undefined
+	>;
+
+	contributors?: Promise<
+		{
+			name: string;
+			email: string;
+			avatarUrl: string;
+			current: boolean;
+			timestamp?: number;
+			count: number;
+			stats?: {
+				files: number;
+				additions: number;
+				deletions: number;
+			};
+		}[]
+	>;
+
+	pr?: Promise<
+		| {
+				id: string;
+				title: string;
+				state: string;
+				url: string;
+
+				launchpad?: Promise<
+					| {
+							category: LaunchpadItem['actionableCategory'];
+							groups: LaunchpadGroup[];
+							suggestedActions: LaunchpadItem['suggestedActions'];
+
+							failingCI: boolean;
+							hasConflicts: boolean;
+
+							review: {
+								decision: LaunchpadItem['reviewDecision'];
+								reviews: NonNullable<LaunchpadItem['reviews']>;
+
+								counts: {
+									approval: number;
+									changeRequest: number;
+									comment: number;
+									codeSuggest: number;
+								};
+							};
+
+							viewer: LaunchpadItem['viewer'];
+					  }
+					| undefined
+				>;
+		  }
+		| undefined
+	>;
+
+	autolinks?: Promise<
+		{
+			id: string;
+			title: string;
+			url: string;
+			state: Omit<Issue['state'], 'merged'>;
+		}[]
+	>;
+
+	issues?: Promise<
+		{
+			id: string;
+			title: string;
+			url: string;
+			state: Omit<Issue['state'], 'merged'>;
+		}[]
+	>;
+
 	worktree?: {
 		name: string;
 		uri: string;
@@ -202,6 +290,7 @@ export const DidChangeWalkthroughProgress = new IpcNotification<DidChangeProgres
 
 export interface DidChangeIntegrationsParams {
 	hasAnyIntegrationConnected: boolean;
+	integrations: IntegrationState[];
 }
 export const DidChangeIntegrationsConnections = new IpcNotification<DidChangeIntegrationsParams>(
 	scope,
