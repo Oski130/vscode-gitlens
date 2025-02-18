@@ -30,7 +30,7 @@ export class ToggleQuickInputButton implements QuickInputButton {
 		return this.getToggledState().tooltip;
 	}
 
-	get on() {
+	get on(): boolean {
 		return this._on;
 	}
 	set on(value: boolean) {
@@ -145,6 +145,11 @@ export const OpenOnGitHubQuickInputButton: QuickInputButton = {
 export const OpenOnGitLabQuickInputButton: QuickInputButton = {
 	iconPath: new ThemeIcon('globe'),
 	tooltip: 'Open on GitLab',
+};
+
+export const OpenOnAzureDevOpsQuickInputButton: QuickInputButton = {
+	iconPath: new ThemeIcon('globe'),
+	tooltip: 'Open on Azure DevOps',
 };
 
 export const OpenOnWebQuickInputButton: QuickInputButton = {

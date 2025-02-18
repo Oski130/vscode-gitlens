@@ -1,3 +1,4 @@
+import type { TemplateResult } from 'lit';
 import { css, html, LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import './code-icon';
@@ -6,12 +7,25 @@ import './code-icon';
 export class GlBranchName extends LitElement {
 	static override styles = css`
 		:host {
-			display: inline-flex;
-			align-items: center;
+			display: inline-block;
+			max-width: 100%;
+			align-content: center;
 			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			vertical-align: middle;
+			margin-top: -3px;
 		}
 
-		strong {
+		.icon {
+			margin: 0 0.3rem 0.1rem 0.2rem;
+		}
+
+		.worktree .icon {
+			margin-right: 0.4rem;
+		}
+
+		.label {
 			font-weight: bold;
 		}
 	`;
@@ -22,12 +36,18 @@ export class GlBranchName extends LitElement {
 	@property({ type: Number })
 	size: number = 12;
 
-	override render() {
-		return html`
-			<code-icon icon="git-branch" size="${this.size}"></code-icon>&nbsp;<strong
-				>${this.name ?? '<missing>'}</strong
-			>
-		`;
+	@property({ type: Boolean })
+	worktree = false;
+
+	override render(): unknown {
+		return html`<span class="${this.worktree ? 'worktree' : 'branch'}"
+			><code-icon
+				class="icon"
+				icon="${this.worktree ? 'gl-worktrees-view' : 'git-branch'}"
+				size="${this.size}"
+			></code-icon
+			><span class="label">${this.name ?? '<missing>'}</span></span
+		>`;
 	}
 }
 
@@ -36,6 +56,7 @@ declare global {
 		'gl-branch-name': GlBranchName;
 	}
 }
-export function renderBranchName(name: string | undefined, size = 12) {
-	return html`<gl-branch-name .name=${name} .size=${size}></gl-branch-name>`;
+
+export function renderBranchName(name: string | undefined, worktree?: boolean): TemplateResult {
+	return html`<gl-branch-name .name=${name} .size=${12} ?worktree=${worktree ?? false}></gl-branch-name>`;
 }

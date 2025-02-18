@@ -1,13 +1,17 @@
 import { ProgressLocation, window } from 'vscode';
 import type { Container } from '../../container';
-import { getNameWithoutRemote } from '../../git/models/branch.utils';
 import type { GitReference } from '../../git/models/reference';
-import { getReferenceLabel, getReferenceTypeLabel, isBranchReference } from '../../git/models/reference.utils';
 import type { Repository } from '../../git/models/repository';
+import {
+	getReferenceLabel,
+	getReferenceNameWithoutRemote,
+	getReferenceTypeLabel,
+	isBranchReference,
+} from '../../git/utils/reference.utils';
 import type { QuickPickItemOfT } from '../../quickpicks/items/common';
 import { createQuickPickSeparator } from '../../quickpicks/items/common';
+import { executeCommand } from '../../system/-webview/command';
 import { isStringArray } from '../../system/array';
-import { executeCommand } from '../../system/vscode/command';
 import type { ViewsWithRepositoryFolders } from '../../views/viewBase';
 import type { PartialStepState, StepGenerator, StepResultGenerator, StepSelection, StepState } from '../quickCommand';
 import { canPickStepContinue, endSteps, isCrossCommandReference, QuickCommand, StepResultBreak } from '../quickCommand';
@@ -81,7 +85,7 @@ export class SwitchGitCommand extends QuickCommand<State> {
 		return this._canConfirmOverride ?? true;
 	}
 
-	async execute(state: SwitchStepState) {
+	private async execute(state: SwitchStepState) {
 		await window.withProgress(
 			{
 				location: ProgressLocation.Notification,
@@ -104,11 +108,11 @@ export class SwitchGitCommand extends QuickCommand<State> {
 		}
 	}
 
-	override isMatch(key: string) {
+	override isMatch(key: string): boolean {
 		return super.isMatch(key) || key === 'checkout';
 	}
 
-	override isFuzzyMatch(name: string) {
+	override isFuzzyMatch(name: string): boolean {
 		return super.isFuzzyMatch(name) || name === 'checkout';
 	}
 
@@ -201,10 +205,9 @@ export class SwitchGitCommand extends QuickCommand<State> {
 			if (isBranchReference(state.reference) && !state.reference.remote) {
 				state.createBranch = undefined;
 
-				const worktree = await this.container.git.getWorktree(
-					state.reference.repoPath,
-					w => w.branch?.name === state.reference!.name,
-				);
+				const worktree = await this.container.git
+					.worktrees(state.reference.repoPath)
+					?.getWorktree(w => w.branch?.name === state.reference!.name);
 				if (worktree != null && !worktree.isDefault) {
 					if (state.fastForwardTo != null) {
 						state.repos[0].merge('--ff-only', state.fastForwardTo.ref);
@@ -250,7 +253,7 @@ export class SwitchGitCommand extends QuickCommand<State> {
 				}
 			} else if (isBranchReference(state.reference) && state.reference.remote) {
 				// See if there is a local branch that tracks the remote branch
-				const { values: branches } = await this.container.git.getBranches(state.reference.repoPath, {
+				const { values: branches } = await this.container.git.branches(state.reference.repoPath).getBranches({
 					filter: b => b.upstream?.name === state.reference!.name,
 					sort: { orderBy: 'date:desc' },
 				});
@@ -291,7 +294,7 @@ export class SwitchGitCommand extends QuickCommand<State> {
 						this._canConfirmOverride = false;
 
 						const result = yield* inputBranchNameStep(state as SwitchStepState, context, {
-							titleContext: ` from ${getReferenceLabel(state.reference, {
+							title: `${context.title} from ${getReferenceLabel(state.reference, {
 								capitalize: true,
 								icon: false,
 								label: state.reference.refType !== 'branch',
@@ -299,7 +302,7 @@ export class SwitchGitCommand extends QuickCommand<State> {
 							value:
 								state.createBranch ?? // if it's a remote branch, pre-fill the name
 								(isBranchReference(state.reference) && state.reference.remote
-									? getNameWithoutRemote(state.reference)
+									? getReferenceNameWithoutRemote(state.reference)
 									: undefined),
 						});
 

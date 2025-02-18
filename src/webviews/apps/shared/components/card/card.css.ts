@@ -4,7 +4,7 @@ export const cardStyles = css`
 	:host {
 		--gl-color-mix-base: var(
 			--gl-card-background,
-			color-mix(in lab, var(--vscode-sideBar-background) 100%, #fff 5%)
+			color-mix(in lab, var(--vscode-sideBar-background) 100%, #fff 3%)
 		);
 	}
 
@@ -15,18 +15,30 @@ export const cardStyles = css`
 		padding: 0.8rem 1.2rem;
 		border-radius: 0.4rem;
 		border-inline-start: 0.3rem solid transparent;
-		border-inline-end: 0.3rem solid transparent;
-		background-color: var(--gl-card-background, color-mix(in lab, var(--vscode-sideBar-background) 100%, #fff 5%));
+		/* border-inline-end: 0.3rem solid transparent; */
+		background-color: var(--gl-card-background, color-mix(in lab, var(--vscode-sideBar-background) 100%, #fff 3%));
 		margin-block-end: 0.6rem;
 		position: relative;
+	}
+
+	:host-context(.vscode-dark) .card.is-base,
+	:host-context(.vscode-high-contrast) .card.is-base {
+		border-inline-start-color: color-mix(in lab, var(--gl-color-mix-base) 100%, #fff 7%);
+	}
+
+	:host-context(.vscode-light) .card.is-base,
+	:host-context(.vscode-high-contrast-light) .card.is-base {
+		border-inline-start-color: color-mix(in lab, var(--gl-color-mix-base) 100%, #000 5%);
 	}
 
 	.card.is-active {
 		border-inline-start-color: var(--gl-card-indicator-border, var(--vscode-gitDecoration-addedResourceForeground));
 	}
 
+	.card.is-cherry-picking,
+	.card.is-merging,
 	.card.is-rebasing,
-	.card.is-merging {
+	.card.is-reverting {
 		border-inline-start-color: var(
 			--gl-card-indicator-border,
 			var(--vscode-gitlens-decorations\\.statusMergingOrRebasingForegroundColor)
@@ -41,58 +53,76 @@ export const cardStyles = css`
 	}
 
 	.card.is-issue-open {
-		border-inline-end-color: var(--gl-card-indicator-border, var(--vscode-gitlens-openAutolinkedIssueIconColor));
+		border-inline-start-color: var(
+			--gl-card-indicator-border,
+			color-mix(in lab, var(--vscode-gitlens-openAutolinkedIssueIconColor) 0%, transparent)
+		);
 	}
 
 	.card.is-issue-closed {
-		border-inline-end-color: var(--gl-card-indicator-border, var(--vscode-gitlens-closedAutolinkedIssueIconColor));
+		border-inline-start-color: var(
+			--gl-card-indicator-border,
+			color-mix(in lab, var(--vscode-gitlens-closedAutolinkedIssueIconColor) 0%, transparent)
+		);
 	}
 
 	.card.is-pr-open {
-		border-inline-end-color: var(--gl-card-indicator-border, var(--vscode-gitlens-openPullRequestIconColor));
+		border-inline-start-color: var(
+			--gl-card-indicator-border,
+			color-mix(in lab, var(--vscode-gitlens-openPullRequestIconColor) 0%, transparent)
+		);
 	}
 
 	.card.is-pr-closed {
-		border-inline-end-color: var(--gl-card-indicator-border, var(--vscode-gitlens-closedPullRequestIconColor));
+		border-inline-start-color: var(
+			--gl-card-indicator-border,
+			color-mix(in lab, var(--vscode-gitlens-closedPullRequestIconColor) 0%, transparent)
+		);
 	}
 
 	.card.is-pr-merged {
-		border-inline-end-color: var(--gl-card-indicator-border, var(--vscode-gitlens-mergedPullRequestIconColor));
+		border-inline-start-color: var(
+			--gl-card-indicator-border,
+			color-mix(in lab, var(--vscode-gitlens-mergedPullRequestIconColor) 0%, transparent)
+		);
 	}
 
 	.card.is-mergeable {
-		border-inline-end-color: var(
+		border-inline-start-color: var(
 			--gl-card-indicator-border,
 			var(var(--vscode-gitlens-launchpadIndicatorMergeableColor))
 		);
 	}
 
 	.card.is-blocked {
-		border-inline-end-color: var(--gl-card-indicator-border, var(--vscode-gitlens-launchpadIndicatorBlockedColor));
+		border-inline-start-color: var(
+			--gl-card-indicator-border,
+			var(--vscode-gitlens-launchpadIndicatorBlockedColor)
+		);
 	}
 
 	.card.is-attention {
-		border-inline-end-color: var(
+		border-inline-start-color: var(
 			--gl-card-indicator-border,
 			var(--vscode-gitlens-launchpadIndicatorAttentionColor)
 		);
 	}
 
+	.card.is-branch-merged {
+		border-inline-start-color: var(--gl-card-indicator-border, var(--vscode-gitlens-mergedPullRequestIconColor));
+	}
+
 	.card.is-branch-synced {
 		border-inline-start-color: var(
 			--gl-card-indicator-border,
-			color-mix(in lab, var(--gl-color-mix-base) 100%, #fff 20%)
+			color-mix(in lab, var(--vscode-gitlens-decorations\\.branchUpToDateForegroundColor) 20%, transparent)
 		);
 	}
 
 	.card.is-branch-diverged {
 		border-inline-start-color: var(
 			--gl-card-indicator-border,
-			color-mix(
-				in lab,
-				var(--vscode-gitlens-decorations\\.branchDivergedForegroundColor) 100%,
-				var(--gl-color-mix-base) 50%
-			)
+			color-mix(in lab, var(--vscode-gitlens-decorations\\.branchDivergedForegroundColor) 70%, transparent)
 		);
 	}
 
@@ -110,11 +140,9 @@ export const cardStyles = css`
 		);
 	}
 
+	.card.is-info,
 	.card.is-branch-changes {
-		border-inline-start-color: var(
-			--gl-card-indicator-border,
-			color-mix(in lab, #1a79ff 100%, var(--gl-color-mix-base) 10%)
-		);
+		border-inline-start-color: var(--gl-card-indicator-border, color-mix(in lab, #1a79ff 80%, transparent));
 	}
 
 	.card.is-branch-missingUpstream {
@@ -160,9 +188,16 @@ export const cardStyles = css`
 		margin-block-end: 0;
 	}
 
-	.card--grouping-item {
+	:host-context(.vscode-dark) .card--grouping-item,
+	:host-context(.vscode-high-contrast) .card--grouping-item {
 		--gl-card-background: color-mix(in lab, var(--vscode-sideBar-background) 100%, #fff 3%);
 		--gl-card-hover-background: color-mix(in lab, var(--vscode-sideBar-background) 100%, #fff 1.5%);
+	}
+
+	:host-context(.vscode-light) .card--grouping-item,
+	:host-context(.vscode-high-contrast-light) .card--grouping-item {
+		--gl-card-background: color-mix(in lab, var(--vscode-sideBar-background) 100%, #000 8%);
+		--gl-card-hover-background: color-mix(in lab, var(--vscode-sideBar-background) 100%, #000 10%);
 	}
 
 	.card--grouping-item-primary {

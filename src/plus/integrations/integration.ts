@@ -1,7 +1,12 @@
 import type { CancellationToken, Event, MessageItem } from 'vscode';
 import { EventEmitter, window } from 'vscode';
-import type { AutolinkReference, DynamicAutolinkReference } from '../../autolinks';
-import type { IntegrationId, IssueIntegrationId, SelfHostedIntegrationId } from '../../constants.integrations';
+import type { AutolinkReference, DynamicAutolinkReference } from '../../autolinks/models/autolinks';
+import type {
+	CloudSelfHostedIntegrationId,
+	IntegrationId,
+	IssueIntegrationId,
+	SelfHostedIntegrationId,
+} from '../../constants.integrations';
 import { HostingIntegrationId } from '../../constants.integrations';
 import type { Sources } from '../../constants.telemetry';
 import type { Container } from '../../container';
@@ -9,7 +14,8 @@ import { AuthenticationError, CancellationError, RequestClientError } from '../.
 import type { PagedResult } from '../../git/gitProvider';
 import type { Account, UnidentifiedAuthor } from '../../git/models/author';
 import type { DefaultBranch } from '../../git/models/defaultBranch';
-import type { Issue, IssueOrPullRequest, SearchedIssue } from '../../git/models/issue';
+import type { Issue, SearchedIssue } from '../../git/models/issue';
+import type { IssueOrPullRequest } from '../../git/models/issueOrPullRequest';
 import type {
 	PullRequest,
 	PullRequestMergeMethod,
@@ -17,20 +23,21 @@ import type {
 	SearchedPullRequest,
 } from '../../git/models/pullRequest';
 import type { RepositoryMetadata } from '../../git/models/repositoryMetadata';
+import type { PullRequestUrlIdentity } from '../../git/utils/pullRequest.utils';
 import { showIntegrationDisconnectedTooManyFailedRequestsWarningMessage } from '../../messages';
-import { gate } from '../../system/decorators/gate';
+import { configuration } from '../../system/-webview/configuration';
+import { gate } from '../../system/decorators/-webview/gate';
 import { debug, log } from '../../system/decorators/log';
 import { first } from '../../system/iterable';
 import { Logger } from '../../system/logger';
 import type { LogScope } from '../../system/logger.scope';
 import { getLogScope } from '../../system/logger.scope';
-import { configuration } from '../../system/vscode/configuration';
-import { isSubscriptionStatePaidOrTrial } from '../gk/account/subscription';
+import { isSubscriptionStatePaidOrTrial } from '../gk/utils/subscription.utils';
 import type {
 	IntegrationAuthenticationProviderDescriptor,
-	IntegrationAuthenticationService,
 	IntegrationAuthenticationSessionDescriptor,
-} from './authentication/integrationAuthentication';
+} from './authentication/integrationAuthenticationProvider';
+import type { IntegrationAuthenticationService } from './authentication/integrationAuthenticationService';
 import type { ProviderAuthenticationSession } from './authentication/models';
 import type {
 	GetIssuesOptions,
@@ -53,6 +60,7 @@ export type IntegrationResult<T> =
 
 export type SupportedIntegrationIds = IntegrationId;
 export type SupportedHostingIntegrationIds = HostingIntegrationId;
+export type SupportedCloudSelfHostedIntegrationIds = CloudSelfHostedIntegrationId;
 export type SupportedIssueIntegrationIds = IssueIntegrationId;
 export type SupportedSelfHostedIntegrationIds = SelfHostedIntegrationId;
 
@@ -165,7 +173,9 @@ export abstract class IntegrationBase<
 	}
 
 	protected _session: ProviderAuthenticationSession | null | undefined;
-	getSession(source: Sources) {
+	getSession(
+		source: Sources,
+	): ProviderAuthenticationSession | Promise<ProviderAuthenticationSession | undefined> | undefined {
 		if (this._session === undefined) {
 			return this.ensureSession({ createIfNeeded: false, source: source });
 		}
@@ -254,7 +264,7 @@ export abstract class IntegrationBase<
 		void (await this.ensureSession({ createIfNeeded: true, forceNewSession: true }));
 	}
 
-	refresh() {
+	refresh(): void {
 		void this.ensureSession({ createIfNeeded: false });
 	}
 
@@ -556,7 +566,7 @@ export abstract class IntegrationBase<
 		const connected = this.maybeConnected ?? (await this.isConnected());
 		if (!connected) return undefined;
 
-		const pr = this.container.cache.getPullRequest(id, resource, this, () => ({
+		const pr = await this.container.cache.getPullRequest(id, resource, this, () => ({
 			value: (async () => {
 				try {
 					const result = await this.getProviderPullRequest?.(this._session!, resource, id);
@@ -1361,4 +1371,10 @@ export abstract class HostingIntegration<
 		repos?: T[],
 		cancellation?: CancellationToken,
 	): Promise<PullRequest[] | undefined>;
+
+	getPullRequestIdentityFromMaybeUrl(search: string): PullRequestUrlIdentity | undefined {
+		return this.getProviderPullRequestIdentityFromMaybeUrl?.(search);
+	}
+
+	protected getProviderPullRequestIdentityFromMaybeUrl?(search: string): PullRequestUrlIdentity | undefined;
 }

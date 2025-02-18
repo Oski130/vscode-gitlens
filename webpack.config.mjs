@@ -120,6 +120,7 @@ function getExtensionConfig(target, mode, env) {
 		plugins.push(
 			new GenerateContributionsPlugin(),
 			new ExtractContributionsPlugin(),
+			new GenerateCommandTypesPlugin(),
 			new DocsPlugin(),
 			new LicensesPlugin(),
 			new FantasticonPlugin({
@@ -183,7 +184,7 @@ function getExtensionConfig(target, mode, env) {
 		},
 		mode: mode,
 		target: target,
-		devtool: mode === 'production' ? false : 'source-map',
+		devtool: mode === 'production' && !env.analyzeBundle ? false : 'source-map',
 		output: {
 			chunkFilename: '[name].js',
 			filename: 'gitlens.js',
@@ -245,7 +246,7 @@ function getExtensionConfig(target, mode, env) {
 								options: {
 									format: 'esm',
 									implementation: esbuild,
-									target: ['es2022', 'chrome114', 'node18.15.0'],
+									target: ['es2023', 'chrome124', 'node20.14.0'],
 									tsconfig: tsConfigPath,
 								},
 						  }
@@ -420,7 +421,7 @@ function getWebviewsConfig(mode, env) {
 		},
 		mode: mode,
 		target: 'web',
-		devtool: mode === 'production' ? false : 'source-map',
+		devtool: mode === 'production' && !env.analyzeBundle ? false : 'source-map',
 		output: {
 			chunkFilename: '[name].js',
 			filename: '[name].js',
@@ -507,7 +508,7 @@ function getWebviewsConfig(mode, env) {
 								options: {
 									format: 'esm',
 									implementation: esbuild,
-									target: ['es2021', 'chrome114'],
+									target: ['es2023', 'chrome124'],
 									tsconfig: tsConfigPath,
 								},
 						  }
@@ -826,6 +827,20 @@ class FileGeneratorPlugin {
 			}
 
 			callback();
+		});
+	}
+}
+
+class GenerateCommandTypesPlugin extends FileGeneratorPlugin {
+	constructor() {
+		super({
+			pluginName: 'commandTypes',
+			pathsToWatch: [path.join(__dirname, 'contributions.json')],
+			command: {
+				name: "'src/constants.commands.generated.ts' command types",
+				command: pkgMgr,
+				args: ['run', 'generate:commandTypes'],
+			},
 		});
 	}
 }

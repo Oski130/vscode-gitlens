@@ -28,6 +28,8 @@
   'global.cloudIntegrations.connected.count': number,
   'global.cloudIntegrations.connected.ids': string,
   'global.debugging': boolean,
+  // Cohort number between 1 and 100 to use for percentage-based rollouts
+  'global.device.cohort': number,
   'global.enabled': boolean,
   'global.folders.count': number,
   'global.folders.schemes': string,
@@ -67,9 +69,12 @@
   'global.subscription.featurePreviews.graph.status': 'eligible' | 'active' | 'expired',
   'global.subscription.previewTrial.expiresOn': string,
   'global.subscription.previewTrial.startedOn': string,
+  // Promo discount code associated with the upgrade
+  'global.subscription.promo.code': string,
+  // Promo key (identifier) associated with the upgrade
+  'global.subscription.promo.key': string,
   'global.subscription.state': -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6,
   'global.subscription.stateString': 'verification' | 'free' | 'preview' | 'preview-expired' | 'trial' | 'trial-expired' | 'trial-reactivation-eligible' | 'paid' | 'unknown',
-  'global.subscription.status': 'verification' | 'free' | 'preview' | 'preview-expired' | 'trial' | 'trial-expired' | 'trial-reactivation-eligible' | 'paid' | 'unknown',
   'global.upgrade': boolean,
   'global.upgradedFrom': string,
   'global.workspace.isTrusted': boolean
@@ -87,7 +92,7 @@
   'account.id': string,
   'code': string,
   'exception': string,
-  'statusCode': string
+  'statusCode': number
 }
 ```
 
@@ -114,8 +119,8 @@
   'failed.error': string,
   'failed.reason': 'user-declined' | 'user-cancelled' | 'error',
   'input.length': number,
-  'model.id': 'claude-3-5-sonnet-latest' | 'claude-3-5-sonnet-20241022' | 'claude-3-5-sonnet-20240620' | 'claude-3-5-haiku-20241022' | 'claude-3-5-haiku-latest' | 'claude-3-opus-latest' | 'claude-3-opus-20240229' | 'claude-3-sonnet-20240229' | 'claude-3-haiku-20240307' | 'claude-2.1' | 'gemini-2.0-flash-exp' | 'gemini-exp-1206' | 'gemini-exp-1121' | 'gemini-1.5-pro-latest' | 'gemini-1.5-flash-latest' | 'gemini-1.5-flash-8b' | 'gemini-1.0-pro' | 'gpt-4o' | 'gpt-4o-mini' | 'o1-preview' | 'o1-mini' | 'Phi-3.5-MoE-instruct' | 'Phi-3.5-mini-instruct' | 'AI21-Jamba-1.5-Large' | 'AI21-Jamba-1.5-Mini' | 'meta-llama/Llama-3.2-11B-Vision-Instruct' | 'Qwen/Qwen2.5-72B-Instruct' | 'NousResearch/Hermes-3-Llama-3.1-8B' | 'mistralai/Mistral-Nemo-Instruct-2407' | 'microsoft/Phi-3.5-mini-instruct' | 'o1-preview-2024-09-12' | 'o1-mini-2024-09-12' | 'gpt-4o-2024-08-06' | 'gpt-4o-2024-05-13' | 'chatgpt-4o-latest' | 'gpt-4o-mini-2024-07-18' | 'gpt-4-turbo' | 'gpt-4-turbo-2024-04-09' | 'gpt-4-turbo-preview' | 'gpt-4-0125-preview' | 'gpt-4-1106-preview' | 'gpt-4' | 'gpt-4-0613' | 'gpt-4-32k' | 'gpt-4-32k-0613' | 'gpt-3.5-turbo' | 'gpt-3.5-turbo-0125' | 'gpt-3.5-turbo-1106' | 'gpt-3.5-turbo-16k' | `${string}:${string}` | 'grok-beta',
-  'model.provider.id': 'anthropic' | 'gemini' | 'github' | 'huggingface' | 'openai' | 'vscode' | 'xai',
+  'model.id': string,
+  'model.provider.id': 'anthropic' | 'deepseek' | 'gemini' | 'github' | 'huggingface' | 'openai' | 'vscode' | 'xai',
   'model.provider.name': string,
   'output.length': number,
   'retry.count': number,
@@ -133,8 +138,8 @@
   'failed.error': string,
   'failed.reason': 'user-declined' | 'user-cancelled' | 'error',
   'input.length': number,
-  'model.id': 'claude-3-5-sonnet-latest' | 'claude-3-5-sonnet-20241022' | 'claude-3-5-sonnet-20240620' | 'claude-3-5-haiku-20241022' | 'claude-3-5-haiku-latest' | 'claude-3-opus-latest' | 'claude-3-opus-20240229' | 'claude-3-sonnet-20240229' | 'claude-3-haiku-20240307' | 'claude-2.1' | 'gemini-2.0-flash-exp' | 'gemini-exp-1206' | 'gemini-exp-1121' | 'gemini-1.5-pro-latest' | 'gemini-1.5-flash-latest' | 'gemini-1.5-flash-8b' | 'gemini-1.0-pro' | 'gpt-4o' | 'gpt-4o-mini' | 'o1-preview' | 'o1-mini' | 'Phi-3.5-MoE-instruct' | 'Phi-3.5-mini-instruct' | 'AI21-Jamba-1.5-Large' | 'AI21-Jamba-1.5-Mini' | 'meta-llama/Llama-3.2-11B-Vision-Instruct' | 'Qwen/Qwen2.5-72B-Instruct' | 'NousResearch/Hermes-3-Llama-3.1-8B' | 'mistralai/Mistral-Nemo-Instruct-2407' | 'microsoft/Phi-3.5-mini-instruct' | 'o1-preview-2024-09-12' | 'o1-mini-2024-09-12' | 'gpt-4o-2024-08-06' | 'gpt-4o-2024-05-13' | 'chatgpt-4o-latest' | 'gpt-4o-mini-2024-07-18' | 'gpt-4-turbo' | 'gpt-4-turbo-2024-04-09' | 'gpt-4-turbo-preview' | 'gpt-4-0125-preview' | 'gpt-4-1106-preview' | 'gpt-4' | 'gpt-4-0613' | 'gpt-4-32k' | 'gpt-4-32k-0613' | 'gpt-3.5-turbo' | 'gpt-3.5-turbo-0125' | 'gpt-3.5-turbo-1106' | 'gpt-3.5-turbo-16k' | `${string}:${string}` | 'grok-beta',
-  'model.provider.id': 'anthropic' | 'gemini' | 'github' | 'huggingface' | 'openai' | 'vscode' | 'xai',
+  'model.id': string,
+  'model.provider.id': 'anthropic' | 'deepseek' | 'gemini' | 'github' | 'huggingface' | 'openai' | 'vscode' | 'xai',
   'model.provider.name': string,
   'output.length': number,
   'retry.count': number,
@@ -151,12 +156,46 @@ or
   'failed.error': string,
   'failed.reason': 'user-declined' | 'user-cancelled' | 'error',
   'input.length': number,
-  'model.id': 'claude-3-5-sonnet-latest' | 'claude-3-5-sonnet-20241022' | 'claude-3-5-sonnet-20240620' | 'claude-3-5-haiku-20241022' | 'claude-3-5-haiku-latest' | 'claude-3-opus-latest' | 'claude-3-opus-20240229' | 'claude-3-sonnet-20240229' | 'claude-3-haiku-20240307' | 'claude-2.1' | 'gemini-2.0-flash-exp' | 'gemini-exp-1206' | 'gemini-exp-1121' | 'gemini-1.5-pro-latest' | 'gemini-1.5-flash-latest' | 'gemini-1.5-flash-8b' | 'gemini-1.0-pro' | 'gpt-4o' | 'gpt-4o-mini' | 'o1-preview' | 'o1-mini' | 'Phi-3.5-MoE-instruct' | 'Phi-3.5-mini-instruct' | 'AI21-Jamba-1.5-Large' | 'AI21-Jamba-1.5-Mini' | 'meta-llama/Llama-3.2-11B-Vision-Instruct' | 'Qwen/Qwen2.5-72B-Instruct' | 'NousResearch/Hermes-3-Llama-3.1-8B' | 'mistralai/Mistral-Nemo-Instruct-2407' | 'microsoft/Phi-3.5-mini-instruct' | 'o1-preview-2024-09-12' | 'o1-mini-2024-09-12' | 'gpt-4o-2024-08-06' | 'gpt-4o-2024-05-13' | 'chatgpt-4o-latest' | 'gpt-4o-mini-2024-07-18' | 'gpt-4-turbo' | 'gpt-4-turbo-2024-04-09' | 'gpt-4-turbo-preview' | 'gpt-4-0125-preview' | 'gpt-4-1106-preview' | 'gpt-4' | 'gpt-4-0613' | 'gpt-4-32k' | 'gpt-4-32k-0613' | 'gpt-3.5-turbo' | 'gpt-3.5-turbo-0125' | 'gpt-3.5-turbo-1106' | 'gpt-3.5-turbo-16k' | `${string}:${string}` | 'grok-beta',
-  'model.provider.id': 'anthropic' | 'gemini' | 'github' | 'huggingface' | 'openai' | 'vscode' | 'xai',
+  'model.id': string,
+  'model.provider.id': 'anthropic' | 'deepseek' | 'gemini' | 'github' | 'huggingface' | 'openai' | 'vscode' | 'xai',
   'model.provider.name': string,
   'output.length': number,
   'retry.count': number,
   'type': 'draftMessage'
+}
+```
+
+or
+
+```typescript
+{
+  'duration': number,
+  'failed.error': string,
+  'failed.reason': 'user-declined' | 'user-cancelled' | 'error',
+  'input.length': number,
+  'model.id': string,
+  'model.provider.id': 'anthropic' | 'deepseek' | 'gemini' | 'github' | 'huggingface' | 'openai' | 'vscode' | 'xai',
+  'model.provider.name': string,
+  'output.length': number,
+  'retry.count': number,
+  'type': 'stashMessage'
+}
+```
+
+or
+
+```typescript
+{
+  'duration': number,
+  'failed.error': string,
+  'failed.reason': 'user-declined' | 'user-cancelled' | 'error',
+  'input.length': number,
+  'model.id': string,
+  'model.provider.id': 'anthropic' | 'deepseek' | 'gemini' | 'github' | 'huggingface' | 'openai' | 'vscode' | 'xai',
+  'model.provider.name': string,
+  'output.length': number,
+  'retry.count': number,
+  'type': 'changelog'
 }
 ```
 
@@ -319,7 +358,7 @@ or
 ```typescript
 {
   'hostingProvider.key': string,
-  'hostingProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'gitlab-self-hosted'
+  'hostingProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'cloud-github-enterprise' | 'cloud-gitlab-self-hosted' | 'gitlab-self-hosted'
 }
 ```
 
@@ -330,7 +369,7 @@ or
 ```typescript
 {
   'hostingProvider.key': string,
-  'hostingProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'gitlab-self-hosted'
+  'hostingProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'cloud-github-enterprise' | 'cloud-gitlab-self-hosted' | 'gitlab-self-hosted'
 }
 ```
 
@@ -341,7 +380,7 @@ or
 ```typescript
 {
   'issueProvider.key': string,
-  'issueProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'gitlab-self-hosted'
+  'issueProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'cloud-github-enterprise' | 'cloud-gitlab-self-hosted' | 'gitlab-self-hosted'
 }
 ```
 
@@ -352,7 +391,7 @@ or
 ```typescript
 {
   'issueProvider.key': string,
-  'issueProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'gitlab-self-hosted'
+  'issueProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'cloud-github-enterprise' | 'cloud-gitlab-self-hosted' | 'gitlab-self-hosted'
 }
 ```
 
@@ -373,7 +412,7 @@ or
 
 ```typescript
 {
-  'integration.id': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello'
+  'integration.id': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'cloud-github-enterprise' | 'cloud-gitlab-self-hosted' | 'gitlab-self-hosted'
 }
 ```
 
@@ -383,9 +422,12 @@ or
 
 ```typescript
 {
+  // Named for compatibility with other GK surfaces
   'draftId': string,
   'provider': string,
+  // Named for compatibility with other GK surfaces
   'reason': 'committed' | 'rejected' | 'accepted',
+  // Named for compatibility with other GK surfaces
   'repoPrivacy': 'private' | 'public' | 'local',
   'repository.visibility': 'private' | 'public' | 'local'
 }
@@ -397,12 +439,17 @@ or
 
 ```typescript
 {
+  // Named for compatibility with other GK surfaces
   'draftId': string,
+  // Named for compatibility with other GK surfaces
   'draftPrivacy': 'private' | 'public' | 'invite_only' | 'provider_access',
+  // Named for compatibility with other GK surfaces
   'filesChanged': number,
   'provider': string,
+  // Named for compatibility with other GK surfaces
   'repoPrivacy': 'private' | 'public' | 'local',
   'repository.visibility': 'private' | 'public' | 'local',
+  // Named for compatibility with other GK surfaces
   'source': 'reviewMode'
 }
 ```
@@ -413,11 +460,15 @@ or
 
 ```typescript
 {
+  // Named for compatibility with other GK surfaces
   'draftId': string,
+  // Named for compatibility with other GK surfaces
   'draftPrivacy': 'private' | 'public' | 'invite_only' | 'provider_access',
   'provider': string,
+  // Named for compatibility with other GK surfaces
   'repoPrivacy': 'private' | 'public' | 'local',
   'repository.visibility': 'private' | 'public' | 'local',
+  // Named for compatibility with other GK surfaces
   'source': string
 }
 ```
@@ -998,6 +1049,17 @@ or
 }
 ```
 
+### home/command
+
+> Sent when a Home command is executed
+
+```typescript
+{
+  'command': string,
+  'webview': string
+}
+```
+
 ### home/createBranch
 
 > Sent when the user chooses to create a branch from the home view
@@ -1396,8 +1458,10 @@ void
 {
   'filesChanged': number,
   'provider': string,
+  // Provided for compatibility with other GK surfaces
   'repoPrivacy': 'private' | 'public' | 'local',
   'repository.visibility': 'private' | 'public' | 'local',
+  // Provided for compatibility with other GK surfaces
   'source': 'account' | 'subscription' | 'graph' | 'patchDetails' | 'settings' | 'timeline' | 'home' | 'view' | 'code-suggest' | 'associateIssueWithBranch' | 'cloud-patches' | 'commandPalette' | 'deeplink' | 'inspect' | 'inspect-overview' | 'integrations' | 'launchpad' | 'launchpad-indicator' | 'launchpad-view' | 'notification' | 'prompt' | 'quick-wizard' | 'remoteProvider' | 'startWork' | 'trial-indicator' | 'scm-input' | 'walkthrough' | 'whatsnew' | 'worktrees'
 }
 ```
@@ -1429,6 +1493,19 @@ void
 }
 ```
 
+### productConfig/failed
+
+> Sent when fetching the product config fails
+
+```typescript
+{
+  'exception': string,
+  'json': string,
+  'reason': 'fetch' | 'validation',
+  'statusCode': number
+}
+```
+
 ### providers/context
 
 > Sent when the "context" of the workspace changes (e.g. repo added, integration connected, etc)
@@ -1454,7 +1531,7 @@ void
 ```typescript
 {
   'hostingProvider.key': string,
-  'hostingProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'gitlab-self-hosted',
+  'hostingProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'cloud-github-enterprise' | 'cloud-gitlab-self-hosted' | 'gitlab-self-hosted',
   // @deprecated: true
   'remoteProviders.key': string
 }
@@ -1467,7 +1544,7 @@ void
 ```typescript
 {
   'hostingProvider.key': string,
-  'hostingProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'gitlab-self-hosted',
+  'hostingProvider.provider': 'github' | 'gitlab' | 'bitbucket' | 'azureDevOps' | 'jira' | 'trello' | 'github-enterprise' | 'cloud-github-enterprise' | 'cloud-gitlab-self-hosted' | 'gitlab-self-hosted',
   // @deprecated: true
   'remoteProviders.key': string
 }
@@ -1691,9 +1768,12 @@ void
   'subscription.featurePreviews.graph.status': 'eligible' | 'active' | 'expired',
   'subscription.previewTrial.expiresOn': string,
   'subscription.previewTrial.startedOn': string,
+  // Promo discount code associated with the upgrade
+  'subscription.promo.code': string,
+  // Promo key (identifier) associated with the upgrade
+  'subscription.promo.key': string,
   'subscription.state': -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6,
-  'subscription.stateString': 'verification' | 'free' | 'preview' | 'preview-expired' | 'trial' | 'trial-expired' | 'trial-reactivation-eligible' | 'paid' | 'unknown',
-  'subscription.status': 'verification' | 'free' | 'preview' | 'preview-expired' | 'trial' | 'trial-expired' | 'trial-reactivation-eligible' | 'paid' | 'unknown'
+  'subscription.stateString': 'verification' | 'free' | 'preview' | 'preview-expired' | 'trial' | 'trial-expired' | 'trial-reactivation-eligible' | 'paid' | 'unknown'
 }
 ```
 
@@ -1703,7 +1783,21 @@ void
 
 ```typescript
 {
-  'action': 'manage' | 'sign-up' | 'sign-in' | 'sign-out' | 'reactivate' | 'resend-verification' | 'pricing' | 'start-preview-trial' | 'upgrade'
+  'action': 'manage' | 'sign-up' | 'sign-in' | 'sign-out' | 'reactivate' | 'resend-verification' | 'pricing' | 'start-preview-trial'
+}
+```
+
+or
+
+```typescript
+{
+  // `true` if the user cancels the VS Code prompt to open the browser
+  'aborted': boolean,
+  'action': 'upgrade',
+  // Promo discount code associated with the upgrade
+  'promo.code': string,
+  // Promo key (identifier) associated with the upgrade
+  'promo.key': string
 }
 ```
 
@@ -1781,9 +1875,12 @@ or
   'subscription.featurePreviews.graph.status': 'eligible' | 'active' | 'expired',
   'subscription.previewTrial.expiresOn': string,
   'subscription.previewTrial.startedOn': string,
+  // Promo discount code associated with the upgrade
+  'subscription.promo.code': string,
+  // Promo key (identifier) associated with the upgrade
+  'subscription.promo.key': string,
   'subscription.state': -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6,
-  'subscription.stateString': 'verification' | 'free' | 'preview' | 'preview-expired' | 'trial' | 'trial-expired' | 'trial-reactivation-eligible' | 'paid' | 'unknown',
-  'subscription.status': 'verification' | 'free' | 'preview' | 'preview-expired' | 'trial' | 'trial-expired' | 'trial-reactivation-eligible' | 'paid' | 'unknown'
+  'subscription.stateString': 'verification' | 'free' | 'preview' | 'preview-expired' | 'trial' | 'trial-expired' | 'trial-reactivation-eligible' | 'paid' | 'unknown'
 }
 ```
 

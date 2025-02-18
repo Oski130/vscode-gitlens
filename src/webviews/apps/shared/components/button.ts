@@ -82,6 +82,7 @@ export class GlButton extends LitElement {
 
 			.label {
 				display: inline-block;
+				max-width: 100%;
 			}
 
 			:host(:hover) {
@@ -211,7 +212,7 @@ export class GlButton extends LitElement {
 	href?: string;
 
 	@property({ reflect: true })
-	override get role() {
+	override get role(): 'link' | 'button' {
 		return this.href ? 'link' : 'button';
 	}
 
@@ -229,7 +230,7 @@ export class GlButton extends LitElement {
 		}
 	}
 
-	protected override render() {
+	protected override render(): unknown {
 		if (this.tooltip) {
 			return html`<gl-tooltip .content=${this.tooltip} placement=${ifDefined(this.tooltipPlacement)}
 				>${this.renderControl()}</gl-tooltip
@@ -272,15 +273,15 @@ export class GlButton extends LitElement {
 		}
 	}
 
-	override focus(options?: FocusOptions) {
+	override focus(options?: FocusOptions): void {
 		this.control.focus(options);
 	}
 
-	override blur() {
+	override blur(): void {
 		this.control.blur();
 	}
 
-	override click() {
+	override click(): void {
 		this.control.click();
 	}
 }

@@ -1,20 +1,20 @@
+import { consume } from '@lit/context';
 import type { TemplateResult } from 'lit';
 import { css, html, LitElement, nothing, unsafeCSS } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import type { GlCommands } from '../../../../constants.commands';
-import { GlCommand } from '../../../../constants.commands';
 import { proTrialLengthInDays, SubscriptionPlanId, SubscriptionState } from '../../../../constants.subscription';
 import type { Source } from '../../../../constants.telemetry';
-import type { Promo } from '../../../../plus/gk/account/promos';
-import { getApplicablePromo } from '../../../../plus/gk/account/promos';
-import type { Subscription } from '../../../../plus/gk/account/subscription';
+import type { Subscription } from '../../../../plus/gk/models/subscription';
 import {
 	getSubscriptionPlanName,
 	getSubscriptionTimeRemaining,
 	isSubscriptionPaid,
 	isSubscriptionStateTrial,
-} from '../../../../plus/gk/account/subscription';
+} from '../../../../plus/gk/utils/subscription.utils';
+import { createCommandLink } from '../../../../system/commands';
 import { pluralize } from '../../../../system/string';
+import type { PromosContext } from '../contexts/promos';
+import { promosContext } from '../contexts/promos';
 import type { GlPopover } from './overlays/popover';
 import { focusOutline } from './styles/lit/a11y.css';
 import { elementBase, linkBase } from './styles/lit/base.css';
@@ -137,6 +137,9 @@ export class GlFeatureBadge extends LitElement {
 	@property({ type: Boolean })
 	preview: boolean = false;
 
+	@consume({ context: promosContext })
+	private promos!: PromosContext;
+
 	@property({ type: Object })
 	source?: Source;
 
@@ -153,7 +156,7 @@ export class GlFeatureBadge extends LitElement {
 		return this.subscription?.state;
 	}
 
-	override render() {
+	override render(): unknown {
 		return html`
 			<gl-popover placement=${this.placement} hoist>
 				<span slot="anchor" class="badge" tabindex="0">${this.renderBadge()}</span>
@@ -221,7 +224,7 @@ export class GlFeatureBadge extends LitElement {
 				content = html`<p>
 					Your
 					<gl-tooltip hoist content="Show Account view">
-						<a href="${generateCommandLink(GlCommand.ShowAccountView, undefined)}"
+						<a href="${createCommandLink('gitlens.showAccountView')}"
 							>${getSubscriptionPlanName(this.subscription?.plan.actual.id ?? SubscriptionPlanId.Pro)}</a
 						>
 					</gl-tooltip>
@@ -233,15 +236,14 @@ export class GlFeatureBadge extends LitElement {
 				content = html`<p>You must verify your email before you can access Pro features.</p>
 					<div class="actions">
 						<gl-button
-							appearance="primary"
 							density="tight"
-							href="${generateCommandLink(GlCommand.PlusResendVerification, this.source)}"
+							href="${createCommandLink<Source>('gitlens.plus.resendVerification', this.source)}"
 							>Resend Email</gl-button
 						>
 						<gl-button
 							appearance="secondary"
 							density="tight"
-							href="${generateCommandLink(GlCommand.PlusValidate, this.source)}"
+							href="${createCommandLink<Source>('gitlens.plus.validate', this.source)}"
 							><code-icon icon="refresh"></code-icon
 						></gl-button>
 					</div>`;
@@ -276,9 +278,8 @@ export class GlFeatureBadge extends LitElement {
 					</p>
 					<div class="actions center">
 						<gl-button
-							appearance="primary"
 							density="tight"
-							href="${generateCommandLink(GlCommand.PlusReactivateProTrial, this.source)}"
+							href="${createCommandLink<Source>('gitlens.plus.reactivateProTrial', this.source)}"
 							tooltip="Reactivate your Pro trial for another ${pluralize('day', proTrialLengthInDays)}"
 							>Reactivate Pro Trial</gl-button
 						>
@@ -319,36 +320,28 @@ export class GlFeatureBadge extends LitElement {
 	private renderStartTrialActions() {
 		return html`<div class="actions">
 			<p>For access to all Pro features:</p>
-			<gl-button
-				appearance="primary"
-				density="tight"
-				href="${generateCommandLink(GlCommand.PlusSignUp, this.source)}"
+			<gl-button density="tight" href="${createCommandLink<Source>('gitlens.plus.signUp', this.source)}"
 				>Start ${proTrialLengthInDays}-day Pro Trial</gl-button
 			>
-			&nbsp;or <a href="${generateCommandLink(GlCommand.PlusLogin, this.source)}" title="Sign In">sign in</a>
+			&nbsp;or
+			<a href="${createCommandLink<Source>('gitlens.plus.login', this.source)}" title="Sign In">sign in</a>
 		</div>`;
 	}
 
 	private renderUpgradeActions(leadin?: TemplateResult) {
-		const promo = getApplicablePromo(this.state, 'badge');
-
 		return html`<div class="actions">
 			${leadin ?? nothing}
-			<gl-button
-				appearance="primary"
-				density="tight"
-				href="${generateCommandLink(GlCommand.PlusUpgrade, this.source)}"
+			<gl-button density="tight" href="${createCommandLink<Source>('gitlens.plus.upgrade', this.source)}"
 				>Upgrade to Pro</gl-button
 			>
-			${this.renderPromo(promo)}
+			${this.renderPromo()}
 		</div>`;
 	}
 
-	private renderPromo(promo: Promo | undefined) {
-		return html`<gl-promo .promo=${promo}></gl-promo>`;
+	private renderPromo() {
+		return html`<gl-promo
+			.promoPromise=${this.promos.getApplicablePromo('badge')}
+			.source=${this.source}
+		></gl-promo>`;
 	}
-}
-
-function generateCommandLink(command: GlCommands, source: Source | undefined) {
-	return `command:${command}${source ? `?${encodeURIComponent(JSON.stringify(source))}` : ''}`;
 }

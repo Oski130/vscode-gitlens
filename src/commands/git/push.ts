@@ -1,17 +1,17 @@
 import { GlyphChars } from '../../constants';
 import type { Container } from '../../container';
 import { Features } from '../../features';
-import { getRemoteNameFromBranchName } from '../../git/models/branch.utils';
 import type { GitBranchReference, GitReference } from '../../git/models/reference';
-import { getReferenceLabel, isBranchReference } from '../../git/models/reference.utils';
 import type { Repository } from '../../git/models/repository';
+import { getRemoteNameFromBranchName } from '../../git/utils/branch.utils';
+import { getReferenceLabel, isBranchReference } from '../../git/utils/reference.utils';
 import { createDirectiveQuickPickItem, Directive } from '../../quickpicks/items/directive';
 import type { FlagsQuickPickItem } from '../../quickpicks/items/flags';
 import { createFlagsQuickPickItem } from '../../quickpicks/items/flags';
+import { configuration } from '../../system/-webview/configuration';
 import { isStringArray } from '../../system/array';
 import { fromNow } from '../../system/date';
 import { pad, pluralize } from '../../system/string';
-import { configuration } from '../../system/vscode/configuration';
 import type { ViewsWithRepositoryFolders } from '../../views/viewBase';
 import type {
 	AsyncStepResultGenerator,
@@ -65,7 +65,7 @@ export class PushGitCommand extends QuickCommand<State> {
 		};
 	}
 
-	execute(state: State<Repository[]>) {
+	private execute(state: State<Repository[]>) {
 		const index = state.flags.indexOf('--set-upstream');
 		if (index !== -1) {
 			return this.container.git.pushAll(state.repos, {
@@ -197,10 +197,10 @@ export class PushGitCommand extends QuickCommand<State> {
 						{ placeholder: 'Cannot push a remote branch' },
 					);
 				} else {
-					const branch = await repo.git.getBranch(state.reference.name);
+					const branch = await repo.git.branches().getBranch(state.reference.name);
 
 					if (branch != null && branch?.upstream == null) {
-						for (const remote of await repo.git.getRemotes()) {
+						for (const remote of await repo.git.remotes().getRemotes()) {
 							items.push(
 								createFlagsQuickPickItem<Flags>(
 									state.flags,
@@ -294,7 +294,7 @@ export class PushGitCommand extends QuickCommand<State> {
 					}
 				}
 			} else {
-				const status = await repo.git.getStatus();
+				const status = await repo.git.status().getStatus();
 
 				const branch: GitBranchReference = {
 					refType: 'branch',
@@ -317,7 +317,7 @@ export class PushGitCommand extends QuickCommand<State> {
 							pushDetails = '';
 						}
 
-						for (const remote of await repo.git.getRemotes()) {
+						for (const remote of await repo.git.remotes().getRemotes()) {
 							items.push(
 								createFlagsQuickPickItem<Flags>(
 									state.flags,

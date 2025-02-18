@@ -466,8 +466,13 @@ export class GlGraphMinimap extends GlElement {
 			color: var(--color-graph-minimap-tip-tagForeground);
 		}
 
-		.bb-event-rects {
+		.bb-event-rects,
+		.bb-event-rect {
 			cursor: pointer !important;
+		}
+		.bb-event-rects:active,
+		.bb-event-rect:active {
+			cursor: ew-resize !important;
 		}
 	`;
 
@@ -491,7 +496,7 @@ export class GlGraphMinimap extends GlElement {
 		this.select(this.activeDay);
 	}
 
-	@property({ type: Map })
+	@property({ type: Object })
 	data: Map<number, GraphMinimapStats | null> | undefined;
 
 	@property({ type: String })
@@ -502,7 +507,7 @@ export class GlGraphMinimap extends GlElement {
 		this.handleDataChanged(false);
 	}
 
-	@property({ type: Map })
+	@property({ type: Object })
 	markers: Map<number, GraphMinimapMarker[]> | undefined;
 
 	@observe('markers')
@@ -510,7 +515,7 @@ export class GlGraphMinimap extends GlElement {
 		this.handleDataChanged(true);
 	}
 
-	@property({ type: Map })
+	@property({ type: Object })
 	searchResults: Map<number, GraphMinimapSearchResultMarker> | undefined;
 
 	@observe('searchResults')
@@ -567,7 +572,7 @@ export class GlGraphMinimap extends GlElement {
 		}
 	}
 
-	select(date: number | Date | undefined, trackOnly: boolean = false) {
+	select(date: number | Date | undefined, trackOnly: boolean = false): void {
 		if (date == null) {
 			this.unselect();
 
@@ -590,7 +595,7 @@ export class GlGraphMinimap extends GlElement {
 		}
 	}
 
-	unselect(date?: number | Date, focus: boolean = false) {
+	unselect(date?: number | Date, focus: boolean = false): void {
 		if (focus) {
 			this.getInternalChart()?.hideGridFocus();
 
@@ -1070,7 +1075,7 @@ export class GlGraphMinimap extends GlElement {
 		this.onActiveDayChanged();
 	}
 
-	override render() {
+	override render(): unknown {
 		return html`
 			<div id="spinner"><code-icon icon="loading" modifier="spin"></code-icon></div>
 			<div id="chart"></div>

@@ -1,6 +1,6 @@
 import React from 'react';
-import type { BranchState, State } from '../../../../../plus/webviews/graph/protocol';
 import { fromNow } from '../../../../../system/date';
+import type { BranchState, State } from '../../../../plus/graph/protocol';
 import { FetchButton } from './fetchButton';
 import { PushPullButton } from './pushPullButton';
 
@@ -14,7 +14,7 @@ export const GitActionsButtons = ({
 	branchName: string | undefined;
 	lastFetched: Date | undefined;
 	state: State;
-}) => {
+}): React.JSX.Element => {
 	const remote = branchState?.upstream ? <span className="md-code">{branchState?.upstream}</span> : 'remote';
 
 	const lastFetchedDate = lastFetched && new Date(lastFetched);

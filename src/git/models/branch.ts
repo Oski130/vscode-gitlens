@@ -1,9 +1,11 @@
-import type { EnrichedAutolink } from '../../autolinks';
+/* eslint-disable @typescript-eslint/no-restricted-imports */ /* TODO need to deal with sharing rich class shapes to webviews */
+import type { EnrichedAutolink } from '../../autolinks/models/autolinks';
 import type { Container } from '../../container';
 import { formatDate, fromNow } from '../../system/date';
+import { memoize } from '../../system/decorators/-webview/memoize';
 import { debug } from '../../system/decorators/log';
-import { memoize } from '../../system/decorators/memoize';
 import { getLoggableName } from '../../system/logger';
+import type { MaybePausedResult } from '../../system/promise';
 import {
 	formatDetachedHeadName,
 	getBranchId,
@@ -11,26 +13,15 @@ import {
 	getRemoteNameFromBranchName,
 	getRemoteNameSlashIndex,
 	isDetachedHead,
-} from './branch.utils';
+} from '../utils/branch.utils';
+import { getUpstreamStatus } from '../utils/status.utils';
 import type { PullRequest, PullRequestState } from './pullRequest';
 import type { GitBranchReference } from './reference';
 import type { GitRemote } from './remote';
-import { getUpstreamStatus } from './status';
 
-export interface GitTrackingState {
-	ahead: number;
-	behind: number;
+export function isBranch(branch: unknown): branch is GitBranch {
+	return branch instanceof GitBranch;
 }
-
-export type GitBranchStatus =
-	| 'local'
-	| 'detached'
-	| 'ahead'
-	| 'behind'
-	| 'diverged'
-	| 'upToDate'
-	| 'missingUpstream'
-	| 'remote';
 
 export class GitBranch implements GitBranchReference {
 	readonly refType = 'branch';
@@ -77,7 +68,7 @@ export class GitBranch implements GitBranchReference {
 			: this.formatDateFromNow();
 	}
 
-	get ref() {
+	get ref(): string {
 		return this.detached ? this.sha! : this.name;
 	}
 
@@ -128,7 +119,7 @@ export class GitBranch implements GitBranchReference {
 
 	@memoize()
 	async getEnrichedAutolinks(): Promise<Map<string, EnrichedAutolink> | undefined> {
-		const remote = await this.container.git.getBestRemoteWithProvider(this.repoPath);
+		const remote = await this.container.git.remotes(this.repoPath).getBestRemoteWithProvider();
 		const branchAutolinks = await this.container.autolinks.getBranchAutolinks(this.name, remote);
 		return this.container.autolinks.getEnrichedAutolinks(branchAutolinks, remote);
 	}
@@ -155,8 +146,7 @@ export class GitBranch implements GitBranchReference {
 		const remoteName = this.getRemoteName();
 		if (remoteName == null) return undefined;
 
-		const remotes = await this.container.git.getRemotes(this.repoPath);
-		return remotes.length ? remotes.find(r => r.name === remoteName) : undefined;
+		return this.container.git.remotes(this.repoPath).getRemote(remoteName);
 	}
 
 	@memoize()
@@ -179,20 +169,37 @@ export class GitBranch implements GitBranchReference {
 		return getUpstreamStatus(this.upstream, this.state, options);
 	}
 
-	get starred() {
+	get starred(): boolean {
 		const starred = this.container.storage.getWorkspace('starred:branches');
 		return starred !== undefined && starred[this.id] === true;
 	}
 
-	star() {
+	async star(): Promise<void> {
 		return this.container.git.getRepository(this.repoPath)?.star(this);
 	}
 
-	unstar() {
+	async unstar(): Promise<void> {
 		return this.container.git.getRepository(this.repoPath)?.unstar(this);
 	}
 }
 
-export function isBranch(branch: any): branch is GitBranch {
-	return branch instanceof GitBranch;
+export interface GitTrackingState {
+	ahead: number;
+	behind: number;
+}
+
+export type GitBranchStatus =
+	| 'local'
+	| 'detached'
+	| 'ahead'
+	| 'behind'
+	| 'diverged'
+	| 'upToDate'
+	| 'missingUpstream'
+	| 'remote';
+
+export interface BranchTargetInfo {
+	baseBranch: string | undefined;
+	defaultBranch: string | undefined;
+	targetBranch: MaybePausedResult<string | undefined>;
 }

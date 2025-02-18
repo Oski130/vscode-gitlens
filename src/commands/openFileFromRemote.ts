@@ -1,17 +1,16 @@
 import { env, Range, Uri, window } from 'vscode';
-import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
-import { command } from '../system/vscode/command';
-import { openEditor } from '../system/vscode/utils';
-import { GlCommandBase } from './base';
+import { command } from '../system/-webview/command';
+import { openEditor } from '../system/-webview/vscode';
+import { GlCommandBase } from './commandBase';
 
 @command()
 export class OpenFileFromRemoteCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super(GlCommand.OpenFileFromRemote);
+		super('gitlens.openFileFromRemote');
 	}
 
-	async execute() {
+	async execute(): Promise<void> {
 		let clipboard: string | undefined = await env.clipboard.readText();
 		try {
 			Uri.parse(clipboard, true);

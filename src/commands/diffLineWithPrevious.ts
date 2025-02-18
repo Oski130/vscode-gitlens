@@ -4,10 +4,11 @@ import type { Container } from '../container';
 import { GitUri } from '../git/gitUri';
 import type { GitCommit } from '../git/models/commit';
 import { showCommitHasNoPreviousCommitWarningMessage, showGenericErrorMessage } from '../messages';
+import { command, executeCommand } from '../system/-webview/command';
 import { Logger } from '../system/logger';
-import { command, executeCommand } from '../system/vscode/command';
-import type { CommandContext } from './base';
-import { ActiveEditorCommand, getCommandUri } from './base';
+import { ActiveEditorCommand } from './commandBase';
+import { getCommandUri } from './commandBase.utils';
+import type { CommandContext } from './commandContext';
 import type { DiffWithCommandArgs } from './diffWith';
 
 export interface DiffLineWithPreviousCommandArgs {
@@ -43,12 +44,9 @@ export class DiffLineWithPreviousCommand extends ActiveEditorCommand {
 		const gitUri = args.commit?.getGitUri() ?? (await GitUri.fromUri(uri));
 
 		try {
-			const diffUris = await this.container.git.getPreviousComparisonUrisForLine(
-				gitUri.repoPath!,
-				gitUri,
-				args.line,
-				gitUri.sha,
-			);
+			const diffUris = await this.container.git
+				.diff(gitUri.repoPath!)
+				.getPreviousComparisonUrisForLine(gitUri, args.line, gitUri.sha);
 
 			if (diffUris?.previous == null) {
 				void showCommitHasNoPreviousCommitWarningMessage();

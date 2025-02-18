@@ -1,41 +1,49 @@
 import type { CancellationToken, LanguageModelChat, LanguageModelChatSelector } from 'vscode';
 import { CancellationTokenSource, LanguageModelChatMessage, lm } from 'vscode';
+import type { VSCodeAIModels } from '../constants.ai';
 import type { TelemetryEvents } from '../constants.telemetry';
 import type { Container } from '../container';
+import { configuration } from '../system/-webview/configuration';
 import { sum } from '../system/iterable';
-import { capitalize, getPossessiveForm, interpolate } from '../system/string';
-import { configuration } from '../system/vscode/configuration';
-import type { AIModel, AIProvider } from './aiProviderService';
-import { getMaxCharacters, showDiffTruncationWarning } from './aiProviderService';
+import { capitalize, interpolate } from '../system/string';
+import type { AIGenerateChangelogChange, AIModel, AIProvider } from './aiProviderService';
 import {
-	explainChangesSystemPrompt,
+	getMaxCharacters,
+	getValidatedTemperature,
+	showDiffTruncationWarning,
+	showPromptTruncationWarning,
+} from './aiProviderService';
+import {
 	explainChangesUserPrompt,
-	generateCloudPatchMessageSystemPrompt,
+	generateChangelogUserPrompt,
 	generateCloudPatchMessageUserPrompt,
-	generateCodeSuggestMessageSystemPrompt,
 	generateCodeSuggestMessageUserPrompt,
-	generateCommitMessageSystemPrompt,
 	generateCommitMessageUserPrompt,
+	generateStashMessageUserPrompt,
 } from './prompts';
 
 const provider = { id: 'vscode', name: 'VS Code Provided' } as const;
 
 type VSCodeAIModel = AIModel<typeof provider.id> & { vendor: string; selector: LanguageModelChatSelector };
-export function isVSCodeAIModel(model: AIModel): model is AIModel<typeof provider.id> {
+
+export function isVSCodeAIModel(model: AIModel): model is AIModel<typeof provider.id, VSCodeAIModels> {
 	return model.provider.id === provider.id;
 }
+
+const accessJustification =
+	'GitLens leverages Copilot for AI-powered features to improve your workflow and development experience.';
 
 export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 	readonly id = provider.id;
 
 	private _name: string | undefined;
-	get name() {
+	get name(): string {
 		return this._name ?? provider.name;
 	}
 
 	constructor(private readonly container: Container) {}
 
-	dispose() {}
+	dispose(): void {}
 
 	async getModels(): Promise<readonly AIModel<typeof provider.id>[]> {
 		const models = await lm.selectChatModels();
@@ -52,8 +60,7 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 		diff: string,
 		reporting: TelemetryEvents['ai/generate'],
 		promptConfig: {
-			type: 'commit' | 'cloud-patch' | 'code-suggestion';
-			systemPrompt: string;
+			type: 'commit' | 'cloud-patch' | 'code-suggestion' | 'stash';
 			userPrompt: string;
 			customInstructions?: string;
 		},
@@ -77,7 +84,6 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 		try {
 			while (true) {
 				const messages: LanguageModelChatMessage[] = [
-					LanguageModelChatMessage.User(promptConfig.systemPrompt),
 					LanguageModelChatMessage.User(
 						interpolate(promptConfig.userPrompt, {
 							diff: diff.substring(0, maxCodeCharacters),
@@ -91,7 +97,14 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 				reporting['input.length'] = (reporting['input.length'] ?? 0) + sum(messages, m => m.content.length);
 
 				try {
-					const rsp = await chatModel.sendRequest(messages, {}, cancellation);
+					const rsp = await chatModel.sendRequest(
+						messages,
+						{
+							justification: accessJustification,
+							modelOptions: { temperature: getValidatedTemperature(model.temperature) },
+						},
+						cancellation,
+					);
 
 					if (diff.length > maxCodeCharacters) {
 						showDiffTruncationWarning(maxCodeCharacters, model);
@@ -108,6 +121,10 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 
 					let message = ex instanceof Error ? ex.message : String(ex);
 
+					if (ex instanceof Error && 'code' in ex && ex.code === 'NoPermissions') {
+						throw new Error(`User denied access to ${model.provider.name}`);
+					}
+
 					if (ex instanceof Error && 'cause' in ex && ex.cause instanceof Error) {
 						message += `\n${ex.cause.message}`;
 
@@ -118,8 +135,8 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 					}
 
 					throw new Error(
-						`Unable to generate ${promptConfig.type} message: (${getPossessiveForm(model.provider.name)}:${
-							ex.code
+						`Unable to generate ${promptConfig.type} message: (${model.provider.name}${
+							ex.code ? `:${ex.code}` : ''
 						}) ${message}`,
 					);
 				}
@@ -151,13 +168,11 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 			codeSuggestion
 				? {
 						type: 'code-suggestion',
-						systemPrompt: generateCodeSuggestMessageSystemPrompt,
 						userPrompt: generateCodeSuggestMessageUserPrompt,
 						customInstructions: configuration.get('ai.generateCodeSuggestMessage.customInstructions'),
 				  }
 				: {
 						type: 'cloud-patch',
-						systemPrompt: generateCloudPatchMessageSystemPrompt,
 						userPrompt: generateCloudPatchMessageUserPrompt,
 						customInstructions: configuration.get('ai.generateCloudPatchMessage.customInstructions'),
 				  },
@@ -180,12 +195,119 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 			reporting,
 			{
 				type: 'commit',
-				systemPrompt: generateCommitMessageSystemPrompt,
 				userPrompt: generateCommitMessageUserPrompt,
 				customInstructions: configuration.get('ai.generateCommitMessage.customInstructions'),
 			},
 			options,
 		);
+	}
+
+	async generateStashMessage(
+		model: VSCodeAIModel,
+		diff: string,
+		reporting: TelemetryEvents['ai/generate'],
+		options?: {
+			cancellation?: CancellationToken | undefined;
+			context?: string | undefined;
+		},
+	): Promise<string | undefined> {
+		return this.generateMessage(
+			model,
+			diff,
+			reporting,
+			{
+				type: 'stash',
+				userPrompt: generateStashMessageUserPrompt,
+				customInstructions: configuration.get('ai.generateStashMessage.customInstructions'),
+			},
+			options,
+		);
+	}
+
+	async generateChangelog(
+		model: VSCodeAIModel,
+		changes: AIGenerateChangelogChange[],
+		reporting: TelemetryEvents['ai/generate'],
+		options?: { cancellation?: CancellationToken },
+	): Promise<string | undefined> {
+		const chatModel = await this.getChatModel(model);
+		if (chatModel == null) return undefined;
+
+		let cancellation;
+		let cancellationSource;
+		if (options?.cancellation == null) {
+			cancellationSource = new CancellationTokenSource();
+			cancellation = cancellationSource.token;
+		} else {
+			cancellation = options.cancellation;
+		}
+
+		let retries = 0;
+		let maxCodeCharacters = getMaxCharacters(model, 3000) - 1000;
+
+		try {
+			while (true) {
+				const data = JSON.stringify(changes);
+
+				const messages: LanguageModelChatMessage[] = [
+					LanguageModelChatMessage.User(
+						interpolate(generateChangelogUserPrompt, {
+							data: data.substring(0, maxCodeCharacters),
+							instructions: configuration.get('ai.generateChangelog.customInstructions') ?? '',
+						}),
+					),
+				];
+
+				reporting['retry.count'] = retries;
+				reporting['input.length'] = (reporting['input.length'] ?? 0) + sum(messages, m => m.content.length);
+
+				try {
+					const rsp = await chatModel.sendRequest(
+						messages,
+						{
+							justification: accessJustification,
+							modelOptions: model.temperature != null ? { temperature: model.temperature } : undefined,
+						},
+						cancellation,
+					);
+
+					if (data.length > maxCodeCharacters) {
+						showPromptTruncationWarning(maxCodeCharacters, model);
+					}
+
+					let result = '';
+					for await (const fragment of rsp.text) {
+						result += fragment;
+					}
+
+					return result.trim();
+				} catch (ex) {
+					debugger;
+					let message = ex instanceof Error ? ex.message : String(ex);
+
+					if (ex instanceof Error && 'code' in ex && ex.code === 'NoPermissions') {
+						throw new Error(`User denied access to ${model.provider.name}`);
+					}
+
+					if (ex instanceof Error && 'cause' in ex && ex.cause instanceof Error) {
+						message += `\n${ex.cause.message}`;
+
+						if (retries++ < 2 && ex.cause.message.includes('exceeds token limit')) {
+							maxCodeCharacters -= 500 * retries;
+							continue;
+						}
+					}
+
+					throw new Error(
+						`Unable to generate changelog: (${model.provider.name}${
+							ex.code ? `:${ex.code}` : ''
+						}) ${message}`,
+					);
+				}
+			}
+		} finally {
+			cancellationSource?.dispose();
+		}
 	}
 
 	async explainChanges(
@@ -212,15 +334,13 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 
 		try {
 			while (true) {
-				const code = diff.substring(0, maxCodeCharacters);
-
 				const messages: LanguageModelChatMessage[] = [
 					LanguageModelChatMessage.User(
-						`${explainChangesSystemPrompt}.\n\n${interpolate(explainChangesUserPrompt, {
-							diff: code,
+						interpolate(explainChangesUserPrompt, {
+							diff: diff.substring(0, maxCodeCharacters),
 							message: message,
 							instructions: configuration.get('ai.explainChanges.customInstructions') ?? '',
-						})}`,
+						}),
 					),
 				];
 
@@ -228,7 +348,14 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 				reporting['input.length'] = (reporting['input.length'] ?? 0) + sum(messages, m => m.content.length);
 
 				try {
-					const rsp = await chatModel.sendRequest(messages, {}, cancellation);
+					const rsp = await chatModel.sendRequest(
+						messages,
+						{
+							justification: accessJustification,
+							modelOptions: model.temperature != null ? { temperature: model.temperature } : undefined,
+						},
+						cancellation,
+					);
 
 					if (diff.length > maxCodeCharacters) {
 						showDiffTruncationWarning(maxCodeCharacters, model);
@@ -244,6 +371,10 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 					debugger;
 					let message = ex instanceof Error ? ex.message : String(ex);
 
+					if (ex instanceof Error && 'code' in ex && ex.code === 'NoPermissions') {
+						throw new Error(`User denied access to ${model.provider.name}`);
+					}
+
 					if (ex instanceof Error && 'cause' in ex && ex.cause instanceof Error) {
 						message += `\n${ex.cause.message}`;
 
@@ -254,7 +385,7 @@ export class VSCodeAIProvider implements AIProvider<typeof provider.id> {
 					}
 
 					throw new Error(
-						`Unable to explain changes: (${getPossessiveForm(model.provider.name)}:${ex.code}) ${message}`,
+						`Unable to explain changes: (${model.provider.name}${ex.code ? `:${ex.code}` : ''}) ${message}`,
 					);
 				}
 			}

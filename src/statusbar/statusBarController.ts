@@ -3,11 +3,15 @@ import { CancellationTokenSource, Disposable, MarkdownString, StatusBarAlignment
 import type { ToggleFileChangesAnnotationCommandArgs } from '../commands/toggleFileAnnotations';
 import { StatusBarCommand } from '../config';
 import { GlyphChars } from '../constants';
+import type { GlCommands } from '../constants.commands';
 import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import { CommitFormatter } from '../git/formatters/commitFormatter';
 import type { PullRequest } from '../git/models/pullRequest';
 import { detailsMessage } from '../hovers/hovers';
+import { createCommand } from '../system/-webview/command';
+import { configuration } from '../system/-webview/configuration';
+import { isTrackableTextEditor } from '../system/-webview/vscode';
 import { createMarkdownCommandLink } from '../system/commands';
 import { debug } from '../system/decorators/log';
 import { once } from '../system/event';
@@ -15,9 +19,6 @@ import { Logger } from '../system/logger';
 import { getLogScope, setLogScopeExit } from '../system/logger.scope';
 import type { MaybePausedResult } from '../system/promise';
 import { getSettledValue, pauseOnCancelOrTimeout } from '../system/promise';
-import { createCommand } from '../system/vscode/command';
-import { configuration } from '../system/vscode/configuration';
-import { isTrackableTextEditor } from '../system/vscode/utils';
 import type { LinesChangeEvent, LineState } from '../trackers/lineTracker';
 
 export class StatusBarController implements Disposable {
@@ -34,7 +35,7 @@ export class StatusBarController implements Disposable {
 		);
 	}
 
-	dispose() {
+	dispose(): void {
 		this.clearBlame();
 
 		this._statusBarBlame?.dispose();
@@ -72,7 +73,7 @@ export class StatusBarController implements Disposable {
 						alignment === StatusBarAlignment.Right ? 999 : 1,
 					);
 				this._statusBarMode.name = 'GitLens Modes';
-				this._statusBarMode.command = GlCommand.SwitchMode;
+				this._statusBarMode.command = 'gitlens.switchMode' satisfies GlCommands;
 				this._statusBarMode.text = mode.statusBarItemName;
 				this._statusBarMode.tooltip = new MarkdownString(
 					`**${mode.statusBarItemName}** ${GlyphChars.Dash} ${mode.description}\n\n---\n\nClick to Switch GitLens Modes`,
@@ -167,14 +168,16 @@ export class StatusBarController implements Disposable {
 					if (!status?.blameable) return;
 
 					statusBarItem.tooltip = new MarkdownString();
-					statusBarItem.tooltip.isTrusted = { enabledCommands: [GlCommand.ShowSettingsPage] };
+					statusBarItem.tooltip.isTrusted = {
+						enabledCommands: ['gitlens.showSettingsPage' satisfies GlCommands],
+					};
 
 					if (doc.canDirtyIdle) {
 						statusBarItem.text = '$(watch) Blame Paused';
 						statusBarItem.tooltip.appendMarkdown(
 							`Blame will resume after a [${configuration.get(
 								'advanced.blame.delayAfterEdit',
-							)} ms delay](${createMarkdownCommandLink<[undefined, string]>(GlCommand.ShowSettingsPage, [
+							)} ms delay](${createMarkdownCommandLink<[undefined, string]>('gitlens.showSettingsPage', [
 								undefined,
 								'advanced.blame.delayAfterEdit',
 							])} 'Change the after edit delay') to limit the performance impact because there are unsaved changes`,
@@ -185,7 +188,7 @@ export class StatusBarController implements Disposable {
 							`Blame will resume after saving because there are unsaved changes and the file is over the [${configuration.get(
 								'advanced.blame.sizeThresholdAfterEdit',
 							)} line threshold](${createMarkdownCommandLink<[undefined, string]>(
-								GlCommand.ShowSettingsPage,
+								'gitlens.showSettingsPage',
 								[undefined, 'advanced.blame.sizeThresholdAfterEdit'],
 							)} 'Change the after edit line threshold') to limit the performance impact`,
 						);
@@ -199,7 +202,7 @@ export class StatusBarController implements Disposable {
 		}
 	}
 
-	clearBlame() {
+	clearBlame(): void {
 		this._selectedSha = undefined;
 		this._cancellation?.cancel();
 		this._statusBarBlame?.hide();
@@ -300,7 +303,7 @@ export class StatusBarController implements Disposable {
 			case StatusBarCommand.ToggleFileChanges: {
 				if (commit.file != null) {
 					this._statusBarBlame.command = createCommand<[Uri, ToggleFileChangesAnnotationCommandArgs]>(
-						GlCommand.ToggleFileChanges,
+						'gitlens.toggleFileChanges',
 						'Toggle File Changes',
 						commit.file.uri,
 						{
@@ -315,7 +318,7 @@ export class StatusBarController implements Disposable {
 			case StatusBarCommand.ToggleFileChangesOnly: {
 				if (commit.file != null) {
 					this._statusBarBlame.command = createCommand<[Uri, ToggleFileChangesAnnotationCommandArgs]>(
-						GlCommand.ToggleFileChanges,
+						'gitlens.toggleFileChanges',
 						'Toggle File Changes',
 						commit.file.uri,
 						{
@@ -337,7 +340,7 @@ export class StatusBarController implements Disposable {
 			label: `${this._statusBarBlame.text}\n${actionTooltip}`,
 		};
 
-		const remotes = await this.container.git.getBestRemotesWithProviders(commit.repoPath);
+		const remotes = await this.container.git.remotes(commit.repoPath).getBestRemotesWithProviders();
 		const [remote] = remotes;
 
 		const defaultDateFormat = configuration.get('defaultDateFormat');

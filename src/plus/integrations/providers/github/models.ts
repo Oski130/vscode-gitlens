@@ -1,6 +1,5 @@
 import type { Endpoints } from '@octokit/types';
-import { HostingIntegrationId } from '../../../../constants.integrations';
-import { GitFileIndexStatus } from '../../../../git/models/file';
+import { GitFileIndexStatus } from '../../../../git/models/fileStatus';
 import type { IssueLabel } from '../../../../git/models/issue';
 import { Issue, RepositoryAccessLevel } from '../../../../git/models/issue';
 import type { PullRequestState } from '../../../../git/models/pullRequest';
@@ -11,7 +10,6 @@ import {
 	PullRequestReviewState,
 	PullRequestStatusCheckRollupState,
 } from '../../../../git/models/pullRequest';
-import type { PullRequestUrlIdentity } from '../../../../git/models/pullRequest.utils';
 import type { Provider } from '../../../../git/models/remoteProvider';
 
 export interface GitHubBlame {
@@ -105,6 +103,7 @@ export interface GitHubPullRequestLite extends Omit<GitHubIssueOrPullRequest, '_
 	};
 
 	isCrossRepository: boolean;
+	isDraft: boolean;
 	mergedAt: string | null;
 	permalink: string;
 
@@ -152,7 +151,6 @@ export interface GitHubPullRequest extends GitHubPullRequestLite {
 	};
 	checksUrl: string;
 	deletions: number;
-	isDraft: boolean;
 	mergeable: GitHubPullRequestMergeableState;
 	reviewDecision: GitHubPullRequestReviewDecision;
 	latestReviews: {
@@ -167,9 +165,15 @@ export interface GitHubPullRequest extends GitHubPullRequestLite {
 			requestedReviewer: GitHubMember | null;
 		}[];
 	};
-	statusCheckRollup: {
-		state: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'EXPECTED' | 'ERROR';
-	} | null;
+	commits: {
+		nodes: {
+			commit: {
+				statusCheckRollup: {
+					state: 'SUCCESS' | 'FAILURE' | 'PENDING' | 'EXPECTED' | 'ERROR';
+				} | null;
+			};
+		}[];
+	};
 	totalCommentsCount: number;
 	viewerCanUpdate: boolean;
 }
@@ -218,6 +222,7 @@ export function fromGitHubPullRequestLite(pr: GitHubPullRequestLite, provider: P
 			},
 			isCrossRepository: pr.isCrossRepository,
 		},
+		pr.isDraft,
 	);
 }
 
@@ -291,6 +296,10 @@ export function toGitHubPullRequestMergeableState(
 			return 'MERGEABLE';
 		case PullRequestMergeableState.Conflicting:
 			return 'CONFLICTING';
+		case PullRequestMergeableState.FailingChecks:
+			return 'UNKNOWN';
+		case PullRequestMergeableState.BlockedByPolicy:
+			return 'UNKNOWN';
 		case PullRequestMergeableState.Unknown:
 			return 'UNKNOWN';
 	}
@@ -394,7 +403,7 @@ export function fromGitHubPullRequest(pr: GitHubPullRequest, provider: Provider)
 			avatarUrl: r.avatarUrl,
 			url: r.url,
 		})),
-		fromGitHubPullRequestStatusCheckRollupState(pr.statusCheckRollup?.state),
+		fromGitHubPullRequestStatusCheckRollupState(pr.commits.nodes?.[0]?.commit.statusCheckRollup?.state),
 	);
 }
 
@@ -509,21 +518,4 @@ export function fromCommitFileStatus(
 			return GitFileIndexStatus.Copied;
 	}
 	return undefined;
-}
-
-const prUrlRegex = /^(?:https?:\/\/)?(?:github\.com\/)?([^/]+\/[^/]+)\/pull\/(\d+)/i;
-
-export function isMaybeGitHubPullRequestUrl(url: string): boolean {
-	if (url == null) return false;
-
-	return prUrlRegex.test(url);
-}
-
-export function getGitHubPullRequestIdentityFromMaybeUrl(url: string): RequireSome<PullRequestUrlIdentity, 'provider'> {
-	if (url == null) return { prNumber: undefined, ownerAndRepo: undefined, provider: HostingIntegrationId.GitHub };
-
-	const match = prUrlRegex.exec(url);
-	if (match == null) return { prNumber: undefined, ownerAndRepo: undefined, provider: HostingIntegrationId.GitHub };
-
-	return { prNumber: match[2], ownerAndRepo: match[1], provider: HostingIntegrationId.GitHub };
 }

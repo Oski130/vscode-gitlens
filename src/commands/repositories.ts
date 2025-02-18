@@ -1,16 +1,15 @@
-import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import { executeGitCommand } from '../git/actions';
-import { command } from '../system/vscode/command';
-import { GlCommandBase } from './base';
+import { command } from '../system/-webview/command';
+import { GlCommandBase } from './commandBase';
 
 @command()
 export class FetchRepositoriesCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super(GlCommand.FetchRepositories);
+		super('gitlens.fetchRepositories');
 	}
 
-	async execute() {
+	async execute(): Promise<void> {
 		return executeGitCommand({
 			command: 'fetch',
 			state: { repos: this.container.git.openRepositories },
@@ -21,10 +20,10 @@ export class FetchRepositoriesCommand extends GlCommandBase {
 @command()
 export class PullRepositoriesCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super(GlCommand.PullRepositories);
+		super('gitlens.pullRepositories');
 	}
 
-	async execute() {
+	async execute(): Promise<void> {
 		return executeGitCommand({
 			command: 'pull',
 			state: { repos: this.container.git.openRepositories },
@@ -35,10 +34,10 @@ export class PullRepositoriesCommand extends GlCommandBase {
 @command()
 export class PushRepositoriesCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super(GlCommand.PushRepositories);
+		super('gitlens.pushRepositories');
 	}
 
-	async execute() {
+	async execute(): Promise<void> {
 		return executeGitCommand({
 			command: 'push',
 			state: { repos: this.container.git.openRepositories },

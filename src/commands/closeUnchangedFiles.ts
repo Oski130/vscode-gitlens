@@ -1,13 +1,12 @@
 import type { Uri } from 'vscode';
 import { TabInputCustom, TabInputNotebook, TabInputNotebookDiff, TabInputText, TabInputTextDiff, window } from 'vscode';
-import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import { showGenericErrorMessage } from '../messages';
 import { getRepositoryOrShowPicker } from '../quickpicks/repositoryPicker';
-import { UriComparer } from '../system/comparers';
+import { command } from '../system/-webview/command';
 import { Logger } from '../system/logger';
-import { command } from '../system/vscode/command';
-import { GlCommandBase } from './base';
+import { uriEquals } from '../system/uri';
+import { GlCommandBase } from './commandBase';
 
 export interface CloseUnchangedFilesCommandArgs {
 	uris?: Uri[];
@@ -16,10 +15,10 @@ export interface CloseUnchangedFilesCommandArgs {
 @command()
 export class CloseUnchangedFilesCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super(GlCommand.CloseUnchangedFiles);
+		super('gitlens.closeUnchangedFiles');
 	}
 
-	async execute(args?: CloseUnchangedFilesCommandArgs) {
+	async execute(args?: CloseUnchangedFilesCommandArgs): Promise<void> {
 		args = { ...args };
 
 		try {
@@ -27,7 +26,7 @@ export class CloseUnchangedFilesCommand extends GlCommandBase {
 				const repository = await getRepositoryOrShowPicker('Close All Unchanged Files');
 				if (repository == null) return;
 
-				const status = await this.container.git.getStatus(repository.uri);
+				const status = await this.container.git.status(repository.uri).getStatus();
 				if (status == null) {
 					void window.showWarningMessage('Unable to close unchanged files');
 
@@ -47,12 +46,12 @@ export class CloseUnchangedFilesCommand extends GlCommandBase {
 						tab.input instanceof TabInputNotebook
 					) {
 						const inputUri = tab.input.uri;
-						if (hasNoChangedFiles || !args.uris.some(uri => UriComparer.equals(uri, inputUri))) {
+						if (hasNoChangedFiles || !args.uris.some(uri => uriEquals(uri, inputUri))) {
 							void window.tabGroups.close(tab, true);
 						}
 					} else if (tab.input instanceof TabInputTextDiff || tab.input instanceof TabInputNotebookDiff) {
 						const inputUri = tab.input.modified;
-						if (hasNoChangedFiles || !args.uris.some(uri => UriComparer.equals(uri, inputUri))) {
+						if (hasNoChangedFiles || !args.uris.some(uri => uriEquals(uri, inputUri))) {
 							void window.tabGroups.close(tab, true);
 						}
 					}

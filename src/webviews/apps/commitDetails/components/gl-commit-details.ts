@@ -2,15 +2,16 @@ import { html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { when } from 'lit/directives/when.js';
-import type { Autolink } from '../../../../autolinks';
+import type { Autolink } from '../../../../autolinks/models/autolinks';
 import type {
 	ConnectCloudIntegrationsCommandArgs,
 	ManageCloudIntegrationsCommandArgs,
 } from '../../../../commands/cloudIntegrations';
 import type { IssueIntegrationId, SupportedCloudIntegrationIds } from '../../../../constants.integrations';
-import type { IssueOrPullRequest } from '../../../../git/models/issue';
+import type { IssueOrPullRequest } from '../../../../git/models/issueOrPullRequest';
 import type { PullRequestShape } from '../../../../git/models/pullRequest';
-import type { Serialized } from '../../../../system/vscode/serialize';
+import { createCommandLink } from '../../../../system/commands';
+import type { Serialized } from '../../../../system/serialize';
 import type { State } from '../../../commitDetails/protocol';
 import { messageHeadlineSplitterToken } from '../../../commitDetails/protocol';
 import type { TreeItemAction, TreeItemBase } from '../../shared/components/tree/base';
@@ -44,12 +45,12 @@ export class GlCommitDetails extends GlDetailsBase {
 	state?: Serialized<State>;
 
 	@state()
-	get isStash() {
+	get isStash(): boolean {
 		return this.state?.commit?.stashNumber != null;
 	}
 
 	@state()
-	get shortSha() {
+	get shortSha(): string {
 		return this.state?.commit?.shortSha ?? '';
 	}
 
@@ -86,7 +87,7 @@ export class GlCommitDetails extends GlDetailsBase {
 		return actions;
 	}
 
-	override updated(changedProperties: Map<string, any>) {
+	override updated(changedProperties: Map<string, any>): void {
 		if (changedProperties.has('explain')) {
 			this.explainBusy = false;
 			this.querySelector('[data-region="commit-explanation"]')?.scrollIntoView();
@@ -175,15 +176,18 @@ export class GlCommitDetails extends GlDetailsBase {
 		const { hasAccount, hasConnectedJira } = this.state;
 
 		let message = html`<a
-				href="command:gitlens.plus.cloudIntegrations.connect?${encodeURIComponent(
-					JSON.stringify({
+				href="${createCommandLink<ConnectCloudIntegrationsCommandArgs>(
+					'gitlens.plus.cloudIntegrations.connect',
+					{
 						integrationIds: ['jira' as IssueIntegrationId.Jira] as SupportedCloudIntegrationIds[],
-						source: 'inspect',
-						detail: {
-							action: 'connect',
-							integration: 'jira',
+						source: {
+							source: 'inspect',
+							detail: {
+								action: 'connect',
+								integration: 'jira',
+							},
 						},
-					} satisfies ConnectCloudIntegrationsCommandArgs),
+					},
 				)}"
 				>Connect to Jira Cloud</a
 			>
@@ -203,7 +207,7 @@ export class GlCommitDetails extends GlDetailsBase {
 	}
 
 	private renderAutoLinks() {
-		if (this.isUncommitted) return undefined;
+		if (!this.state?.autolinksEnabled || this.isUncommitted) return undefined;
 
 		const deduped = new Map<
 			string,
@@ -223,24 +227,24 @@ export class GlCommitDetails extends GlDetailsBase {
 
 		if (this.state?.autolinkedIssues != null) {
 			for (const issue of this.state.autolinkedIssues) {
-				deduped.set(issue.id, { type: 'issue', value: issue });
 				if (issue.url != null) {
 					const autoLinkId = autolinkIdsByUrl.get(issue.url);
 					if (autoLinkId != null) {
 						deduped.delete(autoLinkId);
 					}
 				}
+				deduped.set(issue.id, { type: 'issue', value: issue });
 			}
 		}
 
 		if (this.state?.pullRequest != null) {
-			deduped.set(this.state.pullRequest.id, { type: 'pr', value: this.state.pullRequest });
 			if (this.state.pullRequest.url != null) {
 				const autoLinkId = autolinkIdsByUrl.get(this.state.pullRequest.url);
 				if (autoLinkId != null) {
 					deduped.delete(autoLinkId);
 				}
 			}
+			deduped.set(this.state.pullRequest.id, { type: 'pr', value: this.state.pullRequest });
 		}
 
 		const autolinks: Serialized<Autolink>[] = [];
@@ -263,25 +267,26 @@ export class GlCommitDetails extends GlDetailsBase {
 
 		const { hasAccount, hasConnectedJira } = this.state ?? {};
 		const jiraIntegrationLink = hasConnectedJira
-			? `command:gitlens.plus.cloudIntegrations.manage?${encodeURIComponent(
-					JSON.stringify({
+			? createCommandLink<ManageCloudIntegrationsCommandArgs>('gitlens.plus.cloudIntegrations.manage', {
+					source: {
 						source: 'inspect',
 						detail: {
 							action: 'connect',
 							integration: 'jira',
 						},
-					} satisfies ManageCloudIntegrationsCommandArgs),
-			  )}`
-			: `command:gitlens.plus.cloudIntegrations.connect?${encodeURIComponent(
-					JSON.stringify({
-						integrationIds: ['jira' as IssueIntegrationId.Jira] as SupportedCloudIntegrationIds[],
+					},
+			  })
+			: createCommandLink<ConnectCloudIntegrationsCommandArgs>('gitlens.plus.cloudIntegrations.connect', {
+					integrationIds: ['jira' as IssueIntegrationId.Jira] as SupportedCloudIntegrationIds[],
+					source: {
 						source: 'inspect',
 						detail: {
 							action: 'connect',
 							integration: 'jira',
 						},
-					} satisfies ConnectCloudIntegrationsCommandArgs),
-			  )}`;
+					},
+			  });
+
 		return html`
 			<webview-pane
 				collapsable
@@ -474,7 +479,7 @@ export class GlCommitDetails extends GlDetailsBase {
 		`;
 	}
 
-	override render() {
+	override render(): unknown {
 		if (this.state?.commit == null) {
 			return this.renderEmptyContent();
 		}
@@ -492,7 +497,7 @@ export class GlCommitDetails extends GlDetailsBase {
 		`;
 	}
 
-	onExplainChanges(e: MouseEvent | KeyboardEvent) {
+	private onExplainChanges(e: MouseEvent | KeyboardEvent) {
 		if (this.explainBusy === true || (e instanceof KeyboardEvent && e.key !== 'Enter')) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -503,13 +508,13 @@ export class GlCommitDetails extends GlDetailsBase {
 	}
 
 	private renderCommitStats(stats?: NonNullable<NonNullable<typeof this.state>['commit']>['stats']) {
-		if (stats?.changedFiles == null) return undefined;
+		if (stats?.files == null) return undefined;
 
-		if (typeof stats.changedFiles === 'number') {
-			return html`<commit-stats added="?" modified="${stats.changedFiles}" removed="?"></commit-stats>`;
+		if (typeof stats.files === 'number') {
+			return html`<commit-stats added="?" modified="${stats.files}" removed="?"></commit-stats>`;
 		}
 
-		const { added, deleted, changed } = stats.changedFiles;
+		const { added, deleted, changed } = stats.files;
 		return html`<commit-stats added="${added}" modified="${changed}" removed="${deleted}"></commit-stats>`;
 	}
 

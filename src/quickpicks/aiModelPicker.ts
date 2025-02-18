@@ -1,11 +1,10 @@
 import type { Disposable, QuickInputButton, QuickPickItem } from 'vscode';
 import { QuickPickItemKind, ThemeIcon, window } from 'vscode';
 import type { AIModel } from '../ai/aiProviderService';
-import type { AIModels, AIProviders } from '../constants.ai';
-import { GlCommand } from '../constants.commands';
+import type { AIProviders } from '../constants.ai';
 import type { Container } from '../container';
-import { executeCommand } from '../system/vscode/command';
-import { getQuickPickIgnoreFocusOut } from '../system/vscode/utils';
+import { executeCommand } from '../system/-webview/command';
+import { getQuickPickIgnoreFocusOut } from '../system/-webview/vscode';
 
 export interface ModelQuickPickItem extends QuickPickItem {
 	model: AIModel;
@@ -13,7 +12,7 @@ export interface ModelQuickPickItem extends QuickPickItem {
 
 export async function showAIModelPicker(
 	container: Container,
-	current?: { provider: AIProviders; model: AIModels },
+	current?: { provider: AIProviders; model: string },
 ): Promise<ModelQuickPickItem | undefined> {
 	const models = (await (await container.ai)?.getModels()) ?? [];
 
@@ -60,13 +59,13 @@ export async function showAIModelPicker(
 				}),
 				quickpick.onDidTriggerButton(e => {
 					if (e === ResetAIKeyButton) {
-						void executeCommand(GlCommand.ResetAIKey);
+						void executeCommand('gitlens.resetAIKey');
 					}
 				}),
 			);
 
-			quickpick.title = 'Choose AI Model';
-			quickpick.placeholder = 'Select an AI model to use';
+			quickpick.title = 'Select AI Model';
+			quickpick.placeholder = 'Choose an AI model to use';
 			quickpick.matchOnDescription = true;
 			quickpick.matchOnDetail = true;
 			quickpick.buttons = [ResetAIKeyButton];

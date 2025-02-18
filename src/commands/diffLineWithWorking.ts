@@ -6,10 +6,11 @@ import { GitUri } from '../git/gitUri';
 import type { GitCommit } from '../git/models/commit';
 import { uncommittedStaged } from '../git/models/revision';
 import { showFileNotUnderSourceControlWarningMessage, showGenericErrorMessage } from '../messages';
+import { command, executeCommand } from '../system/-webview/command';
 import { Logger } from '../system/logger';
-import { command, executeCommand } from '../system/vscode/command';
-import type { CommandContext } from './base';
-import { ActiveEditorCommand, getCommandUri } from './base';
+import { ActiveEditorCommand } from './commandBase';
+import { getCommandUri } from './commandBase.utils';
+import type { CommandContext } from './commandContext';
 import type { DiffWithCommandArgs } from './diffWith';
 
 export interface DiffLineWithWorkingCommandArgs {
@@ -63,7 +64,7 @@ export class DiffLineWithWorkingCommand extends ActiveEditorCommand {
 
 				// If the line is uncommitted, use previous commit (or index if the file is staged)
 				if (args.commit.isUncommitted) {
-					const status = await this.container.git.getStatusForFile(gitUri.repoPath!, gitUri);
+					const status = await this.container.git.status(gitUri.repoPath!).getStatusForFile?.(gitUri);
 					if (status?.indexStatus != null) {
 						lhsSha = uncommittedStaged;
 						lhsUri = this.container.git.getAbsoluteUri(

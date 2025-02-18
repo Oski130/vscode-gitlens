@@ -3,6 +3,7 @@ import { signal, SignalWatcher } from '@lit-labs/signals';
 import type { TemplateResult } from 'lit';
 import { css, html, LitElement, nothing } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
+import type { ConnectCloudIntegrationsCommandArgs } from '../../../../../commands/cloudIntegrations';
 import type { LaunchpadCommandArgs } from '../../../../../plus/launchpad/launchpad';
 import { createCommandLink } from '../../../../../system/commands';
 import { pluralize } from '../../../../../system/string';
@@ -10,7 +11,7 @@ import type { GetLaunchpadSummaryResponse, State } from '../../../../home/protoc
 import { DidChangeLaunchpad, GetLaunchpadSummary } from '../../../../home/protocol';
 import { stateContext } from '../../../home/context';
 import { AsyncComputedState } from '../../../shared/components/signal-utils';
-import { ipcContext } from '../../../shared/context';
+import { ipcContext } from '../../../shared/contexts/ipc';
 import type { Disposable } from '../../../shared/events';
 import type { HostIpc } from '../../../shared/ipc';
 import { linkStyles } from '../../shared/components/vscode.css';
@@ -111,15 +112,15 @@ export class GlLaunchpad extends SignalWatcher(LitElement) {
 		return rsp;
 	});
 
-	get startWorkCommand() {
+	get startWorkCommand(): string {
 		return createCommandLink<undefined>('gitlens.home.startWork', undefined);
 	}
 
-	get createBranchCommand() {
+	get createBranchCommand(): string {
 		return createCommandLink<undefined>('gitlens.home.createBranch', undefined);
 	}
 
-	override connectedCallback() {
+	override connectedCallback(): void {
 		super.connectedCallback();
 
 		this._disposable.push(
@@ -135,13 +136,13 @@ export class GlLaunchpad extends SignalWatcher(LitElement) {
 		this._summaryState.run();
 	}
 
-	override disconnectedCallback() {
+	override disconnectedCallback(): void {
 		super.disconnectedCallback();
 
 		this._disposable.forEach(d => d.dispose());
 	}
 
-	override render() {
+	override render(): unknown {
 		return html`
 			<gl-section ?loading=${this._summaryState.computed.status === 'pending'}>
 				<span slot="heading">Launchpad</span>
@@ -153,7 +154,7 @@ export class GlLaunchpad extends SignalWatcher(LitElement) {
 						density="compact"
 						class="start-work"
 						href=${this.createBranchCommand}
-						tooltip="Create a new branch"
+						tooltip="Create New Branch"
 						><code-icon icon="custom-start-work"></code-icon
 					></gl-button>
 				</button-container>
@@ -167,7 +168,10 @@ export class GlLaunchpad extends SignalWatcher(LitElement) {
 				<li>
 					<a
 						class="launchpad-action"
-						href="command:gitlens.plus.cloudIntegrations.connect?%7B%22source%22%3A%22home%22%7D"
+						href="${createCommandLink<ConnectCloudIntegrationsCommandArgs>(
+							'gitlens.plus.cloudIntegrations.connect',
+							{ source: { source: 'home' } },
+						)}"
 					>
 						<code-icon class="launchpad-action__icon" icon="plug"></code-icon>
 						<span>Connect to see PRs and Issue here</span>

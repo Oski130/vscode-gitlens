@@ -2,22 +2,23 @@ import type { TextEditor, Uri } from 'vscode';
 import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import { GitUri } from '../git/gitUri';
-import { getBranchNameWithoutRemote, getRemoteNameFromBranchName } from '../git/models/branch.utils';
 import { RemoteResourceType } from '../git/models/remoteResource';
+import { getBranchNameWithoutRemote, getRemoteNameFromBranchName } from '../git/utils/branch.utils';
 import { showGenericErrorMessage } from '../messages';
 import { getBestRepositoryOrShowPicker } from '../quickpicks/repositoryPicker';
+import { command, executeCommand } from '../system/-webview/command';
 import { Logger } from '../system/logger';
-import { command, executeCommand } from '../system/vscode/command';
-import { ActiveEditorCommand, getCommandUri } from './base';
+import { ActiveEditorCommand } from './commandBase';
+import { getCommandUri } from './commandBase.utils';
 import type { OpenOnRemoteCommandArgs } from './openOnRemote';
 
 @command()
 export class OpenCurrentBranchOnRemoteCommand extends ActiveEditorCommand {
 	constructor(private readonly container: Container) {
-		super(GlCommand.OpenCurrentBranchOnRemote);
+		super('gitlens.openCurrentBranchOnRemote');
 	}
 
-	async execute(editor?: TextEditor, uri?: Uri) {
+	async execute(editor?: TextEditor, uri?: Uri): Promise<void> {
 		uri = getCommandUri(uri, editor);
 
 		const gitUri = uri != null ? await GitUri.fromUri(uri) : undefined;
@@ -26,7 +27,7 @@ export class OpenCurrentBranchOnRemoteCommand extends ActiveEditorCommand {
 		if (repository == null) return;
 
 		try {
-			const branch = await repository.git.getBranch();
+			const branch = await repository.git.branches().getBranch();
 			if (branch?.detached) {
 				void (await executeCommand<OpenOnRemoteCommandArgs>(GlCommand.OpenOnRemote, {
 					resource: {

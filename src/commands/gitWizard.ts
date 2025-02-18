@@ -1,7 +1,7 @@
 import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
-import { command } from '../system/vscode/command';
-import type { CommandContext } from './base';
+import { command } from '../system/-webview/command';
+import type { CommandContext } from './commandContext';
 import type { BranchGitCommandArgs } from './git/branch';
 import type { CherryPickGitCommandArgs } from './git/cherry-pick';
 import type { CoAuthorsGitCommandArgs } from './git/coauthors';
@@ -83,14 +83,14 @@ export class GitWizardCommand extends QuickWizardCommandBase {
 			GlCommand.GitCommandsWorktreeDelete,
 			GlCommand.GitCommandsWorktreeOpen,
 
-			GlCommand.CopyWorkingChangesToWorktree,
+			'gitlens.copyWorkingChangesToWorktree',
 		]);
 	}
 
 	protected override preExecute(
 		context: CommandContext,
 		args?: QuickWizardCommandArgsWithCompletion<GitWizardCommandArgs>,
-	) {
+	): Promise<void> {
 		switch (context.command) {
 			case GlCommand.GitCommandsBranch:
 				return this.execute({ command: 'branch', ...args });
@@ -156,7 +156,7 @@ export class GitWizardCommand extends QuickWizardCommandBase {
 			case GlCommand.GitCommandsWorktreeOpen:
 				return this.execute({ command: 'worktree', state: { subcommand: 'open' } });
 
-			case GlCommand.CopyWorkingChangesToWorktree:
+			case 'gitlens.copyWorkingChangesToWorktree':
 				return this.execute({
 					command: 'worktree',
 					state: { subcommand: 'copy-changes', changes: { type: 'working-tree' } },

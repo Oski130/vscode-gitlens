@@ -4,10 +4,12 @@ import { getLines } from '../../system/string';
 import type { GitBlame, GitBlameAuthor } from '../models/blame';
 import type { GitCommitLine } from '../models/commit';
 import { GitCommit, GitCommitIdentity } from '../models/commit';
-import { GitFileChange, GitFileIndexStatus } from '../models/file';
+import { GitFileChange } from '../models/fileChange';
+import { GitFileIndexStatus } from '../models/fileStatus';
 import { uncommitted } from '../models/revision';
-import { isUncommitted } from '../models/revision.utils';
 import type { GitUser } from '../models/user';
+import { isUncommitted } from '../utils/revision.utils';
+import { isUserMatch } from '../utils/user.utils';
 
 interface BlameEntry {
 	sha: string;
@@ -201,20 +203,12 @@ function parseBlameEntry(
 	commits: Map<string, GitCommit>,
 	authors: Map<string, GitBlameAuthor>,
 	lines: GitCommitLine[],
-	currentUser: { name?: string; email?: string } | undefined,
+	currentUser: GitUser | undefined,
 ) {
 	let commit = commits.get(entry.sha);
 	if (commit == null) {
 		if (entry.author != null) {
-			if (
-				currentUser != null &&
-				// Name or e-mail is configured
-				(currentUser.name != null || currentUser.email != null) &&
-				// Match on name if configured
-				(currentUser.name == null || currentUser.name === entry.author) &&
-				// Match on email if configured
-				(currentUser.email == null || currentUser.email === entry.authorEmail)
-			) {
+			if (isUserMatch(currentUser, entry.author, entry.authorEmail)) {
 				entry.author = 'You';
 			}
 
@@ -228,6 +222,10 @@ function parseBlameEntry(
 			}
 		}
 
+		if (entry.committer != null && isUserMatch(currentUser, entry.committer, entry.committerEmail)) {
+			entry.committer = 'You';
+		}
+
 		commit = new GitCommit(
 			container,
 			repoPath,
@@ -238,6 +236,7 @@ function parseBlameEntry(
 			[],
 			undefined,
 			new GitFileChange(
+				container,
 				repoPath,
 				entry.path,
 				GitFileIndexStatus.Modified,

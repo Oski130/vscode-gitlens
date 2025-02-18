@@ -3,17 +3,19 @@ import { css, html, LitElement, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { when } from 'lit/directives/when.js';
-import type { Commands } from '../../../../../constants.commands';
-import type { LaunchpadItem } from '../../../../../plus/launchpad/launchpadProvider';
+import type { GlCommands } from '../../../../../constants.commands';
+import type { LaunchpadCommandArgs } from '../../../../../plus/launchpad/launchpad';
 import {
+	actionGroupMap,
 	launchpadCategoryToGroupMap,
 	launchpadGroupIconMap,
 	launchpadGroupLabelMap,
-} from '../../../../../plus/launchpad/models';
+} from '../../../../../plus/launchpad/models/launchpad';
 import type { AssociateIssueWithBranchCommandArgs } from '../../../../../plus/startWork/startWork';
 import { createCommandLink } from '../../../../../system/commands';
-import { pluralize } from '../../../../../system/string';
-import type { GetOverviewBranch, OpenInGraphParams } from '../../../../home/protocol';
+import { fromNow } from '../../../../../system/date';
+import { interpolate, pluralize } from '../../../../../system/string';
+import type { BranchRef, GetOverviewBranch, OpenInGraphParams } from '../../../../home/protocol';
 import { renderBranchName } from '../../../shared/components/branch-name';
 import type { GlCard } from '../../../shared/components/card/card';
 import { GlElement, observe } from '../../../shared/components/element';
@@ -164,8 +166,20 @@ export const branchCardStyles = css`
 
 	.branch-item__missing {
 		--button-foreground: inherit;
+	}
+
+	:host-context(.vscode-dark) .branch-item__missing,
+	:host-context(.vscode-high-contrast) .branch-item__missing {
 		--button-background: color-mix(in lab, var(--vscode-sideBar-background) 100%, #fff 3%);
 		--button-hover-background: color-mix(in lab, var(--vscode-sideBar-background) 100%, #fff 1.5%);
+		--button-border: color-mix(in lab, var(--vscode-sideBar-background) 100%, #fff 12%);
+	}
+
+	:host-context(.vscode-light) .branch-item__missing,
+	:host-context(.vscode-high-contrast-light) .branch-item__missing {
+		--button-background: color-mix(in lab, var(--vscode-sideBar-background) 100%, #000 8%);
+		--button-hover-background: color-mix(in lab, var(--vscode-sideBar-background) 100%, #000 10%);
+		--button-border: color-mix(in lab, var(--vscode-sideBar-background) 100%, #000 14%);
 	}
 
 	.branch-item__category {
@@ -189,6 +203,12 @@ export const branchCardStyles = css`
 		display: flex;
 		flex-direction: row;
 		gap: 1rem;
+	}
+
+	.tracking__tooltip,
+	.wip__tooltip {
+		display: contents;
+		vertical-align: middle;
 	}
 
 	.tracking__tooltip p,
@@ -225,123 +245,92 @@ export abstract class GlBranchCardBase extends GlElement {
 		this.autolinksPromise = value?.autolinks;
 		this.contributorsPromise = value?.contributors;
 		this.issuesPromise = value?.issues;
-		this.ownerPromise = value?.owner;
 		this.prPromise = value?.pr;
+		this.mergeTargetPromise = value?.mergeTarget;
 		this.wipPromise = value?.wip;
 	}
 
 	@state()
 	private _autolinks!: Awaited<GetOverviewBranch['autolinks']>;
-	get autolinks() {
+	get autolinks(): Awaited<GetOverviewBranch['autolinks']> {
 		return this._autolinks;
 	}
 
 	private _autolinksPromise!: GetOverviewBranch['autolinks'];
-	get autolinksPromise() {
+	get autolinksPromise(): GetOverviewBranch['autolinks'] {
 		return this._autolinksPromise;
 	}
 	set autolinksPromise(value: GetOverviewBranch['autolinks']) {
 		if (this._autolinksPromise === value) return;
 
 		this._autolinksPromise = value;
-		this._autolinks = undefined;
-
 		void this._autolinksPromise?.then(
 			r => (this._autolinks = r),
-			() => {},
+			() => (this._autolinks = undefined),
 		);
 	}
 
 	@state()
 	private _contributors!: Awaited<GetOverviewBranch['contributors']>;
-	get contributors() {
+	get contributors(): Awaited<GetOverviewBranch['contributors']> {
 		return this._contributors;
 	}
 
 	private _contributorsPromise!: GetOverviewBranch['contributors'];
-	get contributorsPromise() {
+	get contributorsPromise(): GetOverviewBranch['contributors'] {
 		return this._contributorsPromise;
 	}
 	set contributorsPromise(value: GetOverviewBranch['contributors']) {
 		if (this._contributorsPromise === value) return;
 
 		this._contributorsPromise = value;
-		this._contributors = undefined;
-
 		void this._contributorsPromise?.then(
 			r => (this._contributors = r),
-			() => {},
+			() => (this._contributors = undefined),
 		);
 	}
 
 	@state()
 	private _issues!: Awaited<GetOverviewBranch['issues']>;
-	get issues() {
+	get issues(): Awaited<GetOverviewBranch['issues']> {
 		return this._issues;
 	}
 
 	private _issuesPromise!: GetOverviewBranch['issues'];
-	get issuesPromise() {
+	get issuesPromise(): GetOverviewBranch['issues'] {
 		return this._issuesPromise;
 	}
 	set issuesPromise(value: GetOverviewBranch['issues']) {
 		if (this._issuesPromise === value) return;
 
 		this._issuesPromise = value;
-		this._issues = undefined;
-
 		void this._issuesPromise?.then(
 			r => (this._issues = r),
-			() => {},
-		);
-	}
-
-	@state()
-	private _owner!: Awaited<GetOverviewBranch['owner']>;
-	get owner() {
-		return this._owner;
-	}
-
-	private _ownerPromise!: GetOverviewBranch['owner'];
-	get ownerPromise() {
-		return this._ownerPromise;
-	}
-	set ownerPromise(value: GetOverviewBranch['owner']) {
-		if (this._ownerPromise === value) return;
-
-		this._ownerPromise = value;
-		this._owner = undefined;
-
-		void this._ownerPromise?.then(
-			r => (this._owner = r),
-			() => {},
+			() => (this._issues = undefined),
 		);
 	}
 
 	@state()
 	private _pr!: Awaited<GetOverviewBranch['pr']>;
-	get pr() {
+	get pr(): Awaited<GetOverviewBranch['pr']> {
 		return this._pr;
 	}
 
 	private _prPromise!: GetOverviewBranch['pr'];
-	get prPromise() {
+	get prPromise(): GetOverviewBranch['pr'] {
 		return this._prPromise;
 	}
 	set prPromise(value: GetOverviewBranch['pr']) {
 		if (this._prPromise === value) return;
 
 		this._prPromise = value;
-		this._pr = undefined;
-		this.launchpadItemPromise = undefined;
-
 		void this._prPromise?.then(
 			r => {
 				this._pr = r;
-				this.requestUpdate();
 				this.launchpadItemPromise = r?.launchpad;
 			},
 			() => {
+				this._pr = undefined;
 				this.launchpadItemPromise = undefined;
 			},
 		);
@@ -349,45 +338,61 @@ export abstract class GlBranchCardBase extends GlElement {
 
 	@state()
 	private _launchpadItem!: Awaited<NonNullable<Awaited<GetOverviewBranch['pr']>>['launchpad']>;
-	get launchpadItem() {
+	get launchpadItem(): Awaited<NonNullable<Awaited<GetOverviewBranch['pr']>>['launchpad']> {
 		return this._launchpadItem;
 	}
 
 	private _launchpadItemPromise!: NonNullable<Awaited<GetOverviewBranch['pr']>>['launchpad'];
-	get launchpadItemPromise() {
+	get launchpadItemPromise(): NonNullable<Awaited<GetOverviewBranch['pr']>>['launchpad'] {
 		return this._launchpadItemPromise;
 	}
 	set launchpadItemPromise(value: NonNullable<Awaited<GetOverviewBranch['pr']>>['launchpad']) {
 		if (this._launchpadItemPromise === value) return;
 
 		this._launchpadItemPromise = value;
-		this._launchpadItem = undefined;
-
 		void this._launchpadItemPromise?.then(
 			r => (this._launchpadItem = r),
-			() => {},
+			() => (this._launchpadItem = undefined),
+		);
+	}
+
+	@state()
+	private _mergeTarget!: Awaited<GetOverviewBranch['mergeTarget']>;
+	get mergeTarget(): Awaited<GetOverviewBranch['mergeTarget']> {
+		return this._mergeTarget;
+	}
+
+	private _mergeTargetPromise!: GetOverviewBranch['mergeTarget'];
+	get mergeTargetPromise(): GetOverviewBranch['mergeTarget'] {
+		return this._mergeTargetPromise;
+	}
+	set mergeTargetPromise(value: GetOverviewBranch['mergeTarget']) {
+		if (this._mergeTargetPromise === value) return;
+
+		this._mergeTargetPromise = value;
+		void this._mergeTargetPromise?.then(
+			r => (this._mergeTarget = r),
+			() => (this._mergeTarget = undefined),
 		);
 	}
 
 	@state()
 	private _wip!: Awaited<GetOverviewBranch['wip']>;
-	get wip() {
+	get wip(): Awaited<GetOverviewBranch['wip']> {
 		return this._wip;
 	}
 
 	private _wipPromise!: GetOverviewBranch['wip'];
-	get wipPromise() {
+	get wipPromise(): GetOverviewBranch['wip'] {
 		return this._wipPromise;
 	}
 	set wipPromise(value: GetOverviewBranch['wip']) {
 		if (this._wipPromise === value) return;
 
 		this._wipPromise = value;
-		this._wip = undefined;
-
 		void this._wipPromise?.then(
 			r => (this._wip = r),
-			() => {},
+			() => (this._wip = undefined),
 		);
 	}
 
@@ -407,32 +412,49 @@ export abstract class GlBranchCardBase extends GlElement {
 		this.attachFocusListener();
 	}
 
-	get branchRefs() {
+	get branchRef(): BranchRef {
 		return {
 			repoPath: this.repo,
 			branchId: this.branch.id,
+			branchName: this.branch.name,
 		};
 	}
 
-	get isWorktree() {
+	get isWorktree(): boolean {
 		return this.branch.worktree != null;
 	}
 
-	get cardIndicator() {
-		const isMerging = this.wip?.mergeStatus != null;
-		const isRebasing = this.wip?.rebaseStatus != null;
-		if (isMerging || isRebasing) {
+	get cardIndicator(): GlCard['indicator'] {
+		return getLaunchpadItemGrouping(getLaunchpadItemGroup(this.pr, this.launchpadItem)) ?? 'base';
+	}
+
+	get branchCardIndicator(): GlCard['indicator'] {
+		if (!this.branch.opened) return undefined;
+
+		if (this.wip?.pausedOpStatus != null) {
 			if (this.wip?.hasConflicts) return 'conflict';
-			return isMerging ? 'merging' : 'rebasing';
+			switch (this.wip.pausedOpStatus.type) {
+				case 'cherry-pick':
+					return 'cherry-picking';
+				case 'merge':
+					return 'merging';
+				case 'rebase':
+					return 'rebasing';
+				case 'revert':
+					return 'reverting';
+			}
 		}
 
 		const hasWip =
-			!this.branch.opened &&
 			this.wip?.workingTreeState != null &&
 			this.wip.workingTreeState.added + this.wip.workingTreeState.changed + this.wip.workingTreeState.deleted > 0;
 
 		if (hasWip) {
 			return 'branch-changes';
+		}
+
+		if (this.mergeTarget?.mergedStatus?.merged) {
+			return 'branch-merged';
 		}
 
 		switch (this.branch.status) {
@@ -447,23 +469,16 @@ export abstract class GlBranchCardBase extends GlElement {
 			case 'missingUpstream':
 				return 'branch-missingUpstream';
 			default:
-				return 'branch-synced';
+				return undefined;
 		}
 	}
 
-	get branchCardIndicator() {
-		if (this.branch.opened) {
-			return this.cardIndicator;
-		}
-		return undefined;
-	}
-
-	override connectedCallback() {
+	override connectedCallback(): void {
 		super.connectedCallback();
 		this.attachFocusListener();
 	}
 
-	override disconnectedCallback() {
+	override disconnectedCallback(): void {
 		super.disconnectedCallback();
 		this.eventController?.abort();
 	}
@@ -484,7 +499,7 @@ export abstract class GlBranchCardBase extends GlElement {
 		this.toggleExpanded(true);
 	}
 
-	protected renderIssues() {
+	protected renderIssues(): TemplateResult | NothingType {
 		const { autolinks, issues } = this;
 		const issuesSource = issues?.length ? issues : autolinks;
 		if (!issuesSource?.length) return nothing;
@@ -504,7 +519,7 @@ export abstract class GlBranchCardBase extends GlElement {
 		`;
 	}
 
-	protected renderWip() {
+	protected renderWip(): TemplateResult | NothingType {
 		const workingTreeState = this.wip?.workingTreeState;
 		if (workingTreeState == null) return nothing;
 
@@ -517,36 +532,25 @@ export abstract class GlBranchCardBase extends GlElement {
 				removed=${workingTreeState.deleted}
 				symbol="icons"
 			></commit-stats>
-			<div class="wip__tooltip" slot="content">
+			<span class="wip__tooltip" slot="content">
 				<p>${parts.length ? `${parts.join(', ')} in the working tree` : 'No working tree changes'}</p>
-			</div>
+			</span>
 		</gl-tooltip>`;
 	}
 
-	protected renderAvatars() {
-		const { owner, contributors } = this;
+	protected renderAvatars(): TemplateResult | NothingType {
+		const { contributors } = this;
 
-		const avatars = [];
-
-		if (owner) {
-			avatars.push(owner);
-		}
-
-		if (contributors) {
-			avatars.push(...contributors);
-		}
-
-		if (avatars.length === 0) {
-			return undefined;
-		}
+		if (!contributors?.length) return nothing;
 
 		return html`<gl-avatar-list
-			.avatars=${avatars.map(a => ({ name: a.name, src: a.avatarUrl }))}
+			.avatars=${contributors.map(a => ({ name: a.name, src: a.avatarUrl }))}
 			max="1"
 		></gl-avatar-list>`;
 	}
 
-	protected renderTracking(showWip = false) {
+	protected renderTracking(showWip = false): TemplateResult | NothingType {
+		if (this.branch.upstream == null) return nothing;
 		const ahead = this.branch.state.ahead ?? 0;
 		const behind = this.branch.state.behind ?? 0;
 
@@ -597,13 +601,14 @@ export abstract class GlBranchCardBase extends GlElement {
 				ahead=${ahead}
 				behind=${behind}
 				working=${working}
+				?missingUpstream=${this.branch.upstream?.missing ?? false}
 			></gl-tracking-pill>
-			<div class="tracking__tooltip" slot="content">${tooltip}${wipTooltip}</div></gl-tooltip
+			<span class="tracking__tooltip" slot="content">${tooltip}${wipTooltip}</span></gl-tooltip
 		>`;
 	}
 
 	protected abstract getBranchActions(): TemplateResult[];
-	protected renderBranchActions() {
+	protected renderBranchActions(): TemplateResult | NothingType {
 		const actions = this.getBranchActions?.();
 		if (!actions?.length) return nothing;
 
@@ -611,18 +616,18 @@ export abstract class GlBranchCardBase extends GlElement {
 	}
 
 	protected abstract getPrActions(): TemplateResult[];
-	protected renderPrActions() {
+	protected renderPrActions(): TemplateResult | NothingType {
 		const actions = this.getPrActions?.();
 		if (!actions?.length) return nothing;
 
 		return html`<action-nav>${actions}</action-nav>`;
 	}
 
-	protected createCommandLink<T>(command: Commands, args?: T | any) {
-		return createCommandLink<T>(command, args ?? this.branchRefs);
+	protected createCommandLink<T>(command: GlCommands, args?: T | any): string {
+		return createCommandLink<T>(command, args ?? this.branchRef);
 	}
 
-	protected renderTimestamp() {
+	protected renderTimestamp(): TemplateResult | NothingType {
 		const { timestamp } = this.branch;
 		if (timestamp == null) return nothing;
 
@@ -635,7 +640,7 @@ export abstract class GlBranchCardBase extends GlElement {
 
 	protected abstract renderBranchIndicator?(): TemplateResult | undefined;
 
-	protected renderBranchItem(actionsSection?: TemplateResult | NothingType) {
+	protected renderBranchItem(actionsSection?: TemplateResult | NothingType): TemplateResult | NothingType {
 		const wip = this.renderWip();
 		const tracking = this.renderTracking();
 		const avatars = this.renderAvatars();
@@ -678,21 +683,19 @@ export abstract class GlBranchCardBase extends GlElement {
 	}
 
 	private renderBranchIcon() {
-		// Don't show changes on the active branch
 		const hasChanges =
-			!this.branch.opened &&
 			this.wip?.workingTreeState != null &&
 			this.wip.workingTreeState.added + this.wip.workingTreeState.changed + this.wip.workingTreeState.deleted > 0;
 		return html`<gl-branch-icon
-			.state="${this.branch.state}"
-			.hasChanges="${hasChanges}"
-			.missingUpstream=${this.branch.status === 'missingUpstream'}
-			.upstream=${this.branch.upstream?.name}
-			.worktree=${this.branch.worktree != null}
+			branch="${this.branch.name}"
+			status="${this.branch.status}"
+			?hasChanges=${hasChanges}
+			upstream=${this.branch.upstream?.name}
+			?worktree=${this.branch.worktree != null}
 		></gl-branch-icon>`;
 	}
 
-	protected renderPrItem() {
+	protected renderPrItem(): TemplateResult | NothingType {
 		if (!this.pr) {
 			if (this.branch.upstream?.missing === false && this.expanded) {
 				return html`
@@ -708,11 +711,9 @@ export abstract class GlBranchCardBase extends GlElement {
 			return nothing;
 		}
 
-		let indicator: GlCard['indicator'] =
-			this.pr.state === 'merged' ? 'pr-merged' : this.pr.state === 'closed' ? 'pr-closed' : 'pr-open';
-		if (this.launchpadItem) {
-			indicator = getLaunchpadItemGrouping(this.launchpadItem.category);
-		}
+		const indicator: GlCard['indicator'] = this.branch.opened
+			? getLaunchpadItemGrouping(getLaunchpadItemGroup(this.pr, this.launchpadItem)) ?? 'base'
+			: undefined;
 
 		const actions = this.renderPrActions();
 		return html`
@@ -720,7 +721,7 @@ export abstract class GlBranchCardBase extends GlElement {
 				<div class="branch-item__section">
 					<p class="branch-item__grouping">
 						<span class="branch-item__icon">
-							<pr-icon state=${this.pr.state} pr-id=${this.pr.id}></pr-icon>
+							<pr-icon ?draft=${this.pr.draft} state=${this.pr.state} pr-id=${this.pr.id}></pr-icon>
 						</span>
 						<a href=${this.pr.url} class="branch-item__name branch-item__name--secondary"
 							>${this.pr.title}</a
@@ -734,39 +735,62 @@ export abstract class GlBranchCardBase extends GlElement {
 		`;
 	}
 
-	protected renderLaunchpadItem() {
+	protected renderLaunchpadItem(): TemplateResult | NothingType {
 		if (this.launchpadItem == null) return nothing;
 
-		const group = launchpadCategoryToGroupMap.get(this.launchpadItem.category);
-		if (group == null || group === 'other' || group === 'draft' || group === 'current-branch') {
-			return nothing;
-		}
+		const group = getLaunchpadItemGroup(this.pr, this.launchpadItem);
+		if (group == null) return nothing;
 
 		const groupLabel = launchpadGroupLabelMap.get(group);
 		const groupIcon = launchpadGroupIconMap.get(group);
 
 		if (groupLabel == null || groupIcon == null) return nothing;
-		const groupIconString = groupIcon.match(/\$\((.*?)\)/)![1];
+		const groupIconString = groupIcon.match(/\$\((.*?)\)/)![1].replace('gitlens', 'gl');
+
+		const tooltip = interpolate(actionGroupMap.get(this.launchpadItem.category)![1], {
+			author: this.launchpadItem.author?.username ?? 'unknown',
+			createdDateRelative: fromNow(new Date(this.launchpadItem.createdDate)),
+		});
 
 		return html`<div class="branch-item__section branch-item__section--details" slot="context">
-			<p class="launchpad-grouping--${getLaunchpadItemGrouping(this.launchpadItem.category)}">
-				<code-icon icon="${groupIconString}"></code-icon
-				><span class="branch-item__category">${groupLabel.toUpperCase()}</span>
-			</p>
-		</div>`;
+				<p class="launchpad-grouping--${getLaunchpadItemGrouping(group)}">
+					<gl-tooltip content="${tooltip}">
+						<a
+							href=${createCommandLink<Omit<LaunchpadCommandArgs, 'command'>>('gitlens.showLaunchpad', {
+								source: 'home',
+								state: {
+									id: { uuid: this.launchpadItem.uuid, group: group },
+								},
+							} satisfies Omit<LaunchpadCommandArgs, 'command'>)}
+							class="launchpad__grouping"
+						>
+							<code-icon icon="${groupIconString}"></code-icon
+							><span class="branch-item__category">${groupLabel.toUpperCase()}</span></a
+						>
+					</gl-tooltip>
+				</p>
+			</div>
+			${groupIconString
+				? html`<span
+						class="branch-item__summary launchpad-grouping--${getLaunchpadItemGrouping(group)}"
+						slot="summary"
+						><gl-tooltip placement="bottom" content="${groupLabel}"
+							><code-icon icon="${groupIconString}"></code-icon></gl-tooltip
+				  ></span>`
+				: nothing}`;
 	}
 
-	protected renderMergeTargetStatus() {
+	protected renderMergeTargetStatus(): TemplateResult | NothingType {
 		if (!this.branch.mergeTarget) return nothing;
 
 		return html`<gl-merge-target-status
 			class="branch-item__merge-target"
-			.branch=${this.branch.name}
+			.branch=${this.branch}
 			.targetPromise=${this.branch.mergeTarget}
 		></gl-merge-target-status>`;
 	}
 
-	protected renderIssuesItem() {
+	protected renderIssuesItem(): TemplateResult | NothingType {
 		const issues = [...(this.issues ?? []), ...(this.autolinks ?? [])];
 		if (!issues.length) {
 			if (!this.expanded) return nothing;
@@ -783,17 +807,17 @@ export abstract class GlBranchCardBase extends GlElement {
 			>`;
 		}
 
-		let indicator: GlCard['indicator'];
-		for (const issue of issues) {
-			if (issue.state === 'opened') {
-				indicator = 'issue-open';
-				break;
-			}
+		const indicator: GlCard['indicator'] = this.branch.opened ? 'base' : undefined;
+		// for (const issue of issues) {
+		// 	if (issue.state === 'opened') {
+		// 		indicator = 'issue-open';
+		// 		break;
+		// 	}
 
-			if (issue.state === 'closed') {
-				indicator = 'issue-closed';
-			}
-		}
+		// 	if (issue.state === 'closed') {
+		// 		indicator = 'issue-closed';
+		// 	}
+		// }
 
 		return html`
 			<gl-work-item ?expanded=${this.expanded} ?nested=${!this.branch.opened} .indicator=${indicator}>
@@ -802,7 +826,7 @@ export abstract class GlBranchCardBase extends GlElement {
 		`;
 	}
 
-	toggleExpanded(expanded = !this.expanded) {
+	toggleExpanded(expanded = !this.expanded): void {
 		this.expanded = expanded;
 
 		queueMicrotask(() => {
@@ -813,7 +837,7 @@ export abstract class GlBranchCardBase extends GlElement {
 
 @customElement('gl-branch-card')
 export class GlBranchCard extends GlBranchCardBase {
-	override render() {
+	override render(): unknown {
 		return html`
 			<gl-card class="branch-item" focusable .indicator=${this.cardIndicator}>
 				<div class="branch-item__container">
@@ -823,7 +847,7 @@ export class GlBranchCard extends GlBranchCardBase {
 		`;
 	}
 
-	protected getBranchActions() {
+	protected getBranchActions(): TemplateResult[] {
 		const actions = [];
 
 		if (this.branch.worktree) {
@@ -857,7 +881,7 @@ export class GlBranchCard extends GlBranchCardBase {
 				label="Open in Commit Graph"
 				icon="gl-graph"
 				href=${createCommandLink('gitlens.home.openInGraph', {
-					...this.branchRefs,
+					...this.branchRef,
 					type: 'branch',
 				} satisfies OpenInGraphParams)}
 			></action-item>`,
@@ -866,7 +890,7 @@ export class GlBranchCard extends GlBranchCardBase {
 		return actions;
 	}
 
-	protected getPrActions() {
+	protected getPrActions(): TemplateResult[] {
 		return [
 			html`<action-item
 				label="Open Pull Request Changes"
@@ -886,7 +910,7 @@ export class GlBranchCard extends GlBranchCardBase {
 		];
 	}
 
-	renderBranchIndicator() {
+	renderBranchIndicator(): TemplateResult | undefined {
 		return undefined;
 	}
 }
@@ -959,7 +983,7 @@ export class GlWorkUnit extends LitElement {
 	@property({ type: Boolean, reflect: true })
 	expanded: boolean = false;
 
-	override render() {
+	override render(): unknown {
 		return html`<gl-card
 			.density=${this.primary ? 'tight' : undefined}
 			.grouping=${this.nested === false ? undefined : this.primary ? 'item-primary' : 'item'}
@@ -994,9 +1018,22 @@ export class GlWorkUnit extends LitElement {
 	}
 }
 
-function getLaunchpadItemGrouping(category: LaunchpadItem['actionableCategory']) {
-	const group = launchpadCategoryToGroupMap.get(category);
+function getLaunchpadItemGroup(
+	pr: Awaited<GetOverviewBranch['pr']>,
+	launchpadItem: Awaited<NonNullable<Awaited<GetOverviewBranch['pr']>>['launchpad']>,
+) {
+	if (launchpadItem == null || pr?.state !== 'opened') return undefined;
+	if (pr.draft && launchpadItem.category === 'unassigned-reviewers') return undefined;
 
+	const group = launchpadCategoryToGroupMap.get(launchpadItem.category);
+	if (group == null || group === 'other' || group === 'draft' || group === 'current-branch') {
+		return undefined;
+	}
+
+	return group;
+}
+
+function getLaunchpadItemGrouping(group: ReturnType<typeof getLaunchpadItemGroup>) {
 	switch (group) {
 		case 'mergeable':
 			return 'mergeable';

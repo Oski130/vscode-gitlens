@@ -72,7 +72,7 @@ export const homeStyles = css`
 		padding: 0.4rem;
 	}
 
-	.home__aux:has(gl-promo-banner:not([has-promo]):only-child) {
+	.home__aux:has(gl-promo-banner:has(gl-promo:not([has-promo])):only-child) {
 		display: none;
 	}
 
@@ -197,8 +197,8 @@ export const alertStyles = css`
 
 export const navListStyles = css`
 	.nav-list {
-		margin-left: -2rem;
-		margin-right: -2rem;
+		margin-left: -1.2rem;
+		margin-right: -1.2rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.1rem;
@@ -274,7 +274,7 @@ export const navListStyles = css`
 	.nav-list__access {
 		flex: none;
 		position: relative;
-		left: 1.5rem;
+		left: 1.2rem;
 		font-size: x-small;
 		outline: none;
 		white-space: nowrap;
@@ -342,6 +342,8 @@ export const walkthroughProgressStyles = css`
 	}
 	.walkthrough-progress__button {
 		--button-padding: 1px 2px 0px 2px;
+		position: absolute;
+		right: 0.4rem;
 	}
 	.walkthrough-progress__bar::-webkit-progress-bar {
 		border-radius: 2px;

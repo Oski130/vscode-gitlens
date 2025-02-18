@@ -2,18 +2,18 @@ import { GlyphChars } from '../constants';
 import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import type { GitRemote } from '../git/models/remote';
-import { getHighlanderProviders } from '../git/models/remote';
 import type { RemoteResource } from '../git/models/remoteResource';
 import { RemoteResourceType } from '../git/models/remoteResource';
-import { createRevisionRange, shortenRevision } from '../git/models/revision.utils';
 import type { RemoteProvider } from '../git/remotes/remoteProvider';
+import { getHighlanderProviders } from '../git/utils/remote.utils';
+import { createRevisionRange, shortenRevision } from '../git/utils/revision.utils';
 import { showGenericErrorMessage } from '../messages';
 import { showRemoteProviderPicker } from '../quickpicks/remoteProviderPicker';
+import { command } from '../system/-webview/command';
 import { ensureArray } from '../system/array';
 import { Logger } from '../system/logger';
 import { pad, splitSingle } from '../system/string';
-import { command } from '../system/vscode/command';
-import { GlCommandBase } from './base';
+import { GlCommandBase } from './commandBase';
 
 export type OpenOnRemoteCommandArgs =
 	| {
@@ -34,16 +34,16 @@ export type OpenOnRemoteCommandArgs =
 @command()
 export class OpenOnRemoteCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super([GlCommand.OpenOnRemote, GlCommand.Deprecated_OpenInRemote]);
+		super([GlCommand.OpenOnRemote, /** @deprecated */ 'gitlens.openInRemote']);
 	}
 
-	async execute(args?: OpenOnRemoteCommandArgs) {
+	async execute(args?: OpenOnRemoteCommandArgs): Promise<void> {
 		if (args?.resource == null) return;
 
 		let remotes =
 			'remotes' in args
 				? args.remotes
-				: await this.container.git.getRemotesWithProviders(args.repoPath, { sort: true });
+				: await this.container.git.remotes(args.repoPath).getRemotesWithProviders({ sort: true });
 
 		if (args.remote != null) {
 			const filtered = remotes.filter(r => r.name === args.remote);
@@ -71,11 +71,9 @@ export class OpenOnRemoteCommand extends GlCommandBase {
 						const file = await commit.findFile(fileName);
 						if (file?.status === 'D') {
 							// Resolve to the previous commit to that file
-							resource.sha = await this.container.git.resolveReference(
-								commit.repoPath,
-								`${commit.sha}^`,
-								fileName,
-							);
+							resource.sha = await this.container.git
+								.refs(commit.repoPath)
+								.resolveReference(`${commit.sha}^`, fileName);
 						} else {
 							resource.sha = commit.sha;
 						}

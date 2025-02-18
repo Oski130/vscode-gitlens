@@ -1,4 +1,5 @@
 import type { CancellationToken } from 'vscode';
+import type { Response } from '@env/fetch';
 import type { AIModel } from './aiProviderService';
 import { OpenAICompatibleProvider } from './openAICompatibleProvider';
 
@@ -6,6 +7,37 @@ const provider = { id: 'gemini', name: 'Google' } as const;
 
 type GeminiModel = AIModel<typeof provider.id>;
 const models: GeminiModel[] = [
+	{
+		id: 'gemini-2.0-flash',
+		name: 'Gemini 2.0 Flash',
+		maxTokens: { input: 1048576, output: 8192 },
+		provider: provider,
+	},
+	{
+		id: 'gemini-2.0-flash-001',
+		name: 'Gemini 2.0 Flash',
+		maxTokens: { input: 1048576, output: 8192 },
+		provider: provider,
+		hidden: true,
+	},
+	{
+		id: 'gemini-2.0-flash-lite-preview-02-05',
+		name: 'Gemini 2.0 Flash-Lite (Preview)',
+		maxTokens: { input: 1048576, output: 8192 },
+		provider: provider,
+	},
+	{
+		id: 'gemini-2.0-pro-exp-02-05',
+		name: 'Gemini 2.0 Pro (Experimental)',
+		maxTokens: { input: 2097152, output: 8192 },
+		provider: provider,
+	},
+	{
+		id: 'gemini-2.0-flash-thinking-exp-01-21',
+		name: 'Gemini 2.0 Flash Thinking (Experimental)',
+		maxTokens: { input: 1048576, output: 8192 },
+		provider: provider,
+	},
 	{
 		id: 'gemini-2.0-flash-exp',
 		name: 'Gemini 2.0 Flash (Experimental)',
@@ -65,9 +97,9 @@ export class GeminiProvider extends OpenAICompatibleProvider<typeof provider.id>
 		apiKey: string,
 		request: object,
 		cancellation: CancellationToken | undefined,
-	) {
-		if ('max_tokens' in request) {
-			const { max_tokens: _, ...rest } = request;
+	): Promise<Response> {
+		if ('max_completion_tokens' in request) {
+			const { max_completion_tokens: _, ...rest } = request;
 			request = rest;
 		}
 		return super.fetchCore(model, apiKey, request, cancellation);

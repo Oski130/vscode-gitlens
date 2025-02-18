@@ -4,7 +4,8 @@ import { getQueryDataFromScmGitUri } from '../@types/vscode.git.uri';
 import { GlyphChars, Schemes } from '../constants';
 import type { Colors } from '../constants.colors';
 import type { GitBranchStatus } from '../git/models/branch';
-import type { GitFileStatus } from '../git/models/file';
+import type { GitFileStatus } from '../git/models/fileStatus';
+import type { GitPausedOperation } from '../git/models/pausedOperationStatus';
 
 export class ViewFileDecorationProvider implements FileDecorationProvider, Disposable {
 	private readonly _onDidChange = new EventEmitter<undefined | Uri | Uri[]>();
@@ -223,7 +224,7 @@ function getRemoteDecoration(uri: Uri, _token: CancellationToken): FileDecoratio
 }
 
 interface StatusViewDecoration {
-	status: 'merging' | 'rebasing';
+	status: GitPausedOperation;
 	conflicts?: boolean;
 }
 
@@ -231,8 +232,10 @@ function getStatusDecoration(uri: Uri, _token: CancellationToken): FileDecoratio
 	const state = getViewDecoration<'status'>(uri);
 
 	switch (state?.status) {
-		case 'rebasing':
-		case 'merging':
+		case 'cherry-pick':
+		case 'merge':
+		case 'rebase':
+		case 'revert':
 			if (state?.conflicts) {
 				return {
 					badge: '!',

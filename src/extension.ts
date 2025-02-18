@@ -1,7 +1,8 @@
-import { hrtime } from '@env/hrtime';
-import { isWeb } from '@env/platform';
 import type { ExtensionContext } from 'vscode';
 import { version as codeVersion, env, ExtensionMode, Uri, window, workspace } from 'vscode';
+import { hrtime } from '@env/hrtime';
+import { loggingJsonReplacer } from '@env/json';
+import { isWeb } from '@env/platform';
 import { Api } from './api/api';
 import type { CreatePullRequestActionContext, GitLensApi, OpenPullRequestActionContext } from './api/gitlens';
 import type { CreatePullRequestOnRemoteCommandArgs } from './commands/createPullRequestOnRemote';
@@ -13,24 +14,24 @@ import { SyncedStorageKeys } from './constants.storage';
 import { Container } from './container';
 import { isGitUri } from './git/gitUri';
 import { isBranch } from './git/models/branch';
-import { getBranchNameWithoutRemote } from './git/models/branch.utils';
 import { isCommit } from './git/models/commit';
 import { isRepository } from './git/models/repository';
-import { setAbbreviatedShaLength } from './git/models/revision.utils';
 import { isTag } from './git/models/tag';
+import { getBranchNameWithoutRemote } from './git/utils/branch.utils';
+import { setAbbreviatedShaLength } from './git/utils/revision.utils';
 import { showDebugLoggingWarningMessage, showPreReleaseExpiredErrorMessage, showWhatsNewMessage } from './messages';
 import { registerPartnerActionRunners } from './partners';
+import { executeCommand, registerCommands } from './system/-webview/command';
+import { configuration, Configuration } from './system/-webview/configuration';
+import { setContext } from './system/-webview/context';
+import { Storage } from './system/-webview/storage';
+import { deviceCohortGroup, isTextDocument, isTextEditor, isWorkspaceFolder } from './system/-webview/vscode';
 import { setDefaultDateLocales } from './system/date';
 import { once } from './system/event';
 import { BufferedLogChannel, getLoggableName, Logger } from './system/logger';
 import { flatten } from './system/object';
 import { Stopwatch } from './system/stopwatch';
 import { compare, fromString, satisfies } from './system/version';
-import { executeCommand, registerCommands } from './system/vscode/command';
-import { configuration, Configuration } from './system/vscode/configuration';
-import { setContext } from './system/vscode/context';
-import { Storage } from './system/vscode/storage';
-import { isTextDocument, isTextEditor, isWorkspaceFolder } from './system/vscode/utils';
 import { isViewNode } from './views/nodes/abstract/viewNode';
 import './commands';
 
@@ -44,7 +45,7 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 		{
 			name: 'GitLens',
 			createChannel: function (name: string) {
-				const channel = new BufferedLogChannel(window.createOutputChannel(name), 500);
+				const channel = new BufferedLogChannel(window.createOutputChannel(name, { log: true }), 500);
 				context.subscriptions.push(channel);
 
 				if (logLevel === 'error' || logLevel === 'warn') {
@@ -97,6 +98,7 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 
 				return undefined;
 			},
+			sanitizer: loggingJsonReplacer,
 		},
 		logLevel,
 		context.extensionMode === ExtensionMode.Development,
@@ -208,7 +210,7 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 
 				if (!container.prereleaseOrDebugging) {
 					if (await showDebugLoggingWarningMessage()) {
-						void executeCommand(GlCommand.DisableDebugLogging);
+						void executeCommand('gitlens.disableDebugLogging');
 					}
 				}
 			}, 60000);
@@ -235,6 +237,7 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 
 	container.telemetry.setGlobalAttributes({
 		debugging: container.debugging,
+		'device.cohort': deviceCohortGroup,
 		prerelease: prerelease,
 		install: previousVersion == null,
 		upgrade: previousVersion != null && gitlensVersion !== previousVersion,
@@ -269,7 +272,7 @@ export async function activate(context: ExtensionContext): Promise<GitLensApi | 
 	return Promise.resolve(api);
 }
 
-export function deactivate() {
+export function deactivate(): void {
 	Logger.log('GitLens deactivating...');
 	Container.instance.deactivate();
 }

@@ -7,14 +7,14 @@ import { GitUri } from '../git/gitUri';
 import type { GitCommit } from '../git/models/commit';
 import { isCommit } from '../git/models/commit';
 import type { GitBranchReference, GitRevisionReference } from '../git/models/reference';
-import { getReferenceLabel } from '../git/models/reference.utils';
 import type { RepositoryChangeEvent } from '../git/models/repository';
 import { RepositoryChange, RepositoryChangeComparisonMode } from '../git/models/repository';
-import { groupRepositories } from '../git/models/repository.utils';
-import { getWorktreesByBranch } from '../git/models/worktree.utils';
-import { gate } from '../system/decorators/gate';
-import { executeCommand } from '../system/vscode/command';
-import { configuration } from '../system/vscode/configuration';
+import { groupRepositories } from '../git/utils/-webview/repository.utils';
+import { getWorktreesByBranch } from '../git/utils/-webview/worktree.utils';
+import { getReferenceLabel } from '../git/utils/reference.utils';
+import { executeCommand } from '../system/-webview/command';
+import { configuration } from '../system/-webview/configuration';
+import { gate } from '../system/decorators/-webview/gate';
 import { RepositoriesSubscribeableNode } from './nodes/abstract/repositoriesSubscribeableNode';
 import { RepositoryFolderNode } from './nodes/abstract/repositoryFolderNode';
 import type { ViewNode } from './nodes/abstract/viewNode';
@@ -33,7 +33,7 @@ export class BranchesRepositoryNode extends RepositoryFolderNode<BranchesView, B
 		return this.child.getChildren();
 	}
 
-	protected changed(e: RepositoryChangeEvent) {
+	protected changed(e: RepositoryChangeEvent): boolean {
 		if (this.view.config.showStashes && e.changed(RepositoryChange.Stash, RepositoryChangeComparisonMode.Any)) {
 			return true;
 		}
@@ -44,7 +44,7 @@ export class BranchesRepositoryNode extends RepositoryFolderNode<BranchesView, B
 			RepositoryChange.Index,
 			RepositoryChange.Remotes,
 			RepositoryChange.RemoteProviders,
-			RepositoryChange.Status,
+			RepositoryChange.PausedOperationStatus,
 			RepositoryChange.Unknown,
 			RepositoryChangeComparisonMode.Any,
 		);
@@ -89,9 +89,11 @@ export class BranchesViewNode extends RepositoriesSubscribeableNode<BranchesView
 			const [child] = this.children;
 
 			const { showRemoteBranches } = this.view.config;
-			const defaultRemote = showRemoteBranches ? (await child.repo.git.getDefaultRemote())?.name : undefined;
+			const defaultRemote = showRemoteBranches
+				? (await child.repo.git.remotes().getDefaultRemote())?.name
+				: undefined;
 
-			const branches = await child.repo.git.getBranches({
+			const branches = await child.repo.git.branches().getBranches({
 				filter: b =>
 					!b.remote || (showRemoteBranches && defaultRemote != null && b.getRemoteName() === defaultRemote),
 			});
@@ -131,7 +133,7 @@ export class BranchesView extends ViewBase<'branches', BranchesViewNode, Branche
 		return this.container.prereleaseOrDebugging;
 	}
 
-	protected getRoot() {
+	protected getRoot(): BranchesViewNode {
 		return new BranchesViewNode(this);
 	}
 
@@ -204,7 +206,7 @@ export class BranchesView extends ViewBase<'branches', BranchesViewNode, Branche
 		];
 	}
 
-	protected override filterConfigurationChanged(e: ConfigurationChangeEvent) {
+	protected override filterConfigurationChanged(e: ConfigurationChangeEvent): boolean {
 		const changed = super.filterConfigurationChanged(e);
 		if (
 			!changed &&
@@ -224,7 +226,7 @@ export class BranchesView extends ViewBase<'branches', BranchesViewNode, Branche
 		return true;
 	}
 
-	findBranch(branch: GitBranchReference, token?: CancellationToken) {
+	async findBranch(branch: GitBranchReference, token?: CancellationToken): Promise<ViewNode | undefined> {
 		if (branch.remote) return undefined;
 
 		const { repoPath } = branch;
@@ -245,16 +247,20 @@ export class BranchesView extends ViewBase<'branches', BranchesViewNode, Branche
 		});
 	}
 
-	async findCommit(commit: GitCommit | { repoPath: string; ref: string }, token?: CancellationToken) {
+	async findCommit(
+		commit: GitCommit | { repoPath: string; ref: string },
+		token?: CancellationToken,
+	): Promise<ViewNode | undefined> {
 		const { repoPath } = commit;
 
 		// Get all the branches the commit is on
-		const branches = await this.container.git.getCommitBranches(
-			commit.repoPath,
-			commit.ref,
-			undefined,
-			isCommit(commit) ? { commitDate: commit.committer.date } : undefined,
-		);
+		const branches = await this.container.git
+			.branches(commit.repoPath)
+			.getBranchesWithCommits(
+				[commit.ref],
+				undefined,
+				isCommit(commit) ? { commitDate: commit.committer.date } : undefined,
+			);
 		if (branches.length === 0) return undefined;
 
 		return this.findNode((n: any) => n.commit?.ref === commit.ref, {
@@ -279,14 +285,14 @@ export class BranchesView extends ViewBase<'branches', BranchesViewNode, Branche
 	}
 
 	@gate(() => '')
-	revealBranch(
+	async revealBranch(
 		branch: GitBranchReference,
 		options?: {
 			select?: boolean;
 			focus?: boolean;
 			expand?: boolean | number;
 		},
-	) {
+	): Promise<ViewNode | undefined> {
 		return window.withProgress(
 			{
 				location: ProgressLocation.Notification,
@@ -315,7 +321,7 @@ export class BranchesView extends ViewBase<'branches', BranchesViewNode, Branche
 			focus?: boolean;
 			expand?: boolean | number;
 		},
-	) {
+	): Promise<ViewNode | undefined> {
 		return window.withProgress(
 			{
 				location: ProgressLocation.Notification,
@@ -340,7 +346,7 @@ export class BranchesView extends ViewBase<'branches', BranchesViewNode, Branche
 	async revealRepository(
 		repoPath: string,
 		options?: { select?: boolean; focus?: boolean; expand?: boolean | number },
-	) {
+	): Promise<ViewNode | undefined> {
 		const node = await this.findNode(n => n instanceof RepositoryFolderNode && n.repoPath === repoPath, {
 			maxDepth: 1,
 			canTraverse: n => n instanceof BranchesViewNode || n instanceof RepositoryFolderNode,

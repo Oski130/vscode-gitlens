@@ -1,17 +1,17 @@
 import { window } from 'vscode';
 import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
-import type { GraphWebviewShowingArgs } from '../plus/webviews/graph/registration';
-import { command, executeCoreCommand } from '../system/vscode/command';
+import { command, executeCoreCommand } from '../system/-webview/command';
 import type { HomeWebviewShowingArgs } from '../webviews/home/registration';
-import type { CommandContext } from './base';
-import { GlCommandBase } from './base';
+import type { GraphWebviewShowingArgs } from '../webviews/plus/graph/registration';
+import { GlCommandBase } from './commandBase';
+import type { CommandContext } from './commandContext';
 
 @command()
 export class ShowViewCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
 		super([
-			GlCommand.ShowAccountView,
+			'gitlens.showAccountView',
 			GlCommand.ShowBranchesView,
 			GlCommand.ShowCommitDetailsView,
 			GlCommand.ShowCommitsView,
@@ -33,11 +33,11 @@ export class ShowViewCommand extends GlCommandBase {
 		]);
 	}
 
-	protected override preExecute(context: CommandContext, ...args: unknown[]) {
+	protected override preExecute(context: CommandContext, ...args: unknown[]): Promise<void> {
 		return this.execute(context, ...args);
 	}
 
-	async notifyWhenNoRepository(featureName?: string) {
+	async notifyWhenNoRepository(featureName?: string): Promise<void> {
 		if (this.container.git.openRepositoryCount > 0) {
 			return;
 		}
@@ -53,10 +53,10 @@ export class ShowViewCommand extends GlCommandBase {
 		}
 	}
 
-	async execute(context: CommandContext, ...args: unknown[]) {
+	async execute(context: CommandContext, ...args: unknown[]): Promise<void> {
 		const command = context.command;
 		switch (command) {
-			case GlCommand.ShowAccountView:
+			case 'gitlens.showAccountView':
 				return this.container.views.home.show(
 					undefined,
 					...([{ focusAccount: true }, ...args] as HomeWebviewShowingArgs),

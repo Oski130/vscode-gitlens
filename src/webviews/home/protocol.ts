@@ -1,14 +1,14 @@
 import type { IntegrationDescriptor } from '../../constants.integrations';
+import type { GitBranchMergedStatus } from '../../git/gitProvider';
 import type { GitBranchStatus, GitTrackingState } from '../../git/models/branch';
 import type { Issue } from '../../git/models/issue';
-import type { GitMergeStatus } from '../../git/models/merge';
 import type { MergeConflict } from '../../git/models/mergeConflict';
-import type { GitRebaseStatus } from '../../git/models/rebase';
+import type { GitPausedOperationStatus } from '../../git/models/pausedOperationStatus';
 import type { GitBranchReference } from '../../git/models/reference';
-import type { Subscription } from '../../plus/gk/account/subscription';
+import type { Subscription } from '../../plus/gk/models/subscription';
 import type { LaunchpadSummaryResult } from '../../plus/launchpad/launchpadIndicator';
 import type { LaunchpadItem } from '../../plus/launchpad/launchpadProvider';
-import type { LaunchpadGroup } from '../../plus/launchpad/models';
+import type { LaunchpadGroup } from '../../plus/launchpad/models/launchpad';
 import type { IpcScope, WebviewState } from '../protocol';
 import { IpcCommand, IpcNotification, IpcRequest } from '../protocol';
 
@@ -28,14 +28,14 @@ export interface State extends WebviewState {
 	integrations: IntegrationState[];
 	avatar?: string;
 	organizationsCount?: number;
-	walkthroughProgress: {
+	walkthroughProgress?: {
 		doneCount: number;
 		allCount: number;
 		progress: number;
 	};
-	showWalkthroughProgress?: boolean;
 	previewEnabled: boolean;
 	newInstall: boolean;
+	amaBannerCollapsed: boolean;
 }
 
 export interface IntegrationState extends IntegrationDescriptor {
@@ -49,7 +49,7 @@ export interface OverviewFilters {
 	recent: {
 		threshold: OverviewRecentThreshold;
 	};
-	stale: { threshold: OverviewStaleThreshold; show: boolean };
+	stale: { threshold: OverviewStaleThreshold; show: boolean; limit: number };
 }
 
 // REQUESTS
@@ -63,10 +63,6 @@ export const GetLaunchpadSummary = new IpcRequest<GetLaunchpadSummaryRequest, Ge
 	'launchpad/summary',
 );
 
-export interface GetOverviewRequest {
-	[key: string]: unknown;
-}
-
 export interface GetOverviewBranch {
 	reference: GitBranchReference;
 
@@ -76,8 +72,8 @@ export interface GetOverviewBranch {
 	opened: boolean;
 	timestamp?: number;
 	state: GitTrackingState;
-	upstream: { name: string; missing: boolean } | undefined;
 	status: GitBranchStatus;
+	upstream: { name: string; missing: boolean } | undefined;
 
 	wip?: Promise<
 		| {
@@ -88,8 +84,7 @@ export interface GetOverviewBranch {
 				};
 				hasConflicts?: boolean;
 				conflictsCount?: number;
-				mergeStatus?: GitMergeStatus;
-				rebaseStatus?: GitRebaseStatus;
+				pausedOpStatus?: GitPausedOperationStatus;
 		  }
 		| undefined
 	>;
@@ -97,30 +92,15 @@ export interface GetOverviewBranch {
 	mergeTarget?: Promise<
 		| {
 				repoPath: string;
-				name: string | undefined;
+				id: string;
+				name: string;
 				status?: GitTrackingState;
+				mergedStatus?: GitBranchMergedStatus;
 				potentialConflicts?: MergeConflict;
 
 				targetBranch: string | undefined;
 				baseBranch: string | undefined;
 				defaultBranch: string | undefined;
-		  }
-		| undefined
-	>;
-
-	owner?: Promise<
-		| {
-				name: string;
-				email: string;
-				avatarUrl: string;
-				current: boolean;
-				timestamp?: number;
-				count: number;
-				stats?: {
-					files: number;
-					additions: number;
-					deletions: number;
-				};
 		  }
 		| undefined
 	>;
@@ -147,15 +127,20 @@ export interface GetOverviewBranch {
 				title: string;
 				state: string;
 				url: string;
+				draft?: boolean;
 
 				launchpad?: Promise<
 					| {
+							uuid: string;
 							category: LaunchpadItem['actionableCategory'];
 							groups: LaunchpadGroup[];
 							suggestedActions: LaunchpadItem['suggestedActions'];
 
 							failingCI: boolean;
 							hasConflicts: boolean;
+
+							author: LaunchpadItem['author'];
+							createdDate: LaunchpadItem['createdDate'];
 
 							review: {
 								decision: LaunchpadItem['reviewDecision'];
@@ -200,32 +185,43 @@ export interface GetOverviewBranch {
 		uri: string;
 	};
 }
-export interface GetOverviewBranches {
-	active: GetOverviewBranch[];
-	recent: GetOverviewBranch[];
-	stale: GetOverviewBranch[];
+
+export interface OverviewRepository {
+	name: string;
+	path: string;
+	provider?: {
+		name: string;
+		icon?: string;
+		url?: string;
+	};
 }
 
-export type GetOverviewResponse =
+// TODO: look at splitting off selected repo
+export type GetActiveOverviewResponse =
 	| {
-			repository: {
-				name: string;
-				path: string;
-				provider?: {
-					name: string;
-					icon?: string;
-					url?: string;
-				};
-				branches: GetOverviewBranches;
-			};
+			repository: OverviewRepository;
+			active: GetOverviewBranch;
 	  }
 	| undefined;
-export const GetOverview = new IpcRequest<GetOverviewRequest, GetOverviewResponse>(scope, 'overview');
+
+export const GetActiveOverview = new IpcRequest<undefined, GetActiveOverviewResponse>(scope, 'overview/active');
+
+// TODO: look at splitting off selected repo
+export type GetInactiveOverviewResponse =
+	| {
+			repository: OverviewRepository;
+			recent: GetOverviewBranch[];
+			stale?: GetOverviewBranch[];
+	  }
+	| undefined;
+
+export const GetInactiveOverview = new IpcRequest<undefined, GetInactiveOverviewResponse>(scope, 'overview/inactive');
 
 export type GetOverviewFilterStateResponse = OverviewFilters;
 export const GetOverviewFilterState = new IpcRequest<void, GetOverviewFilterStateResponse>(scope, 'overviewFilter');
 
-export const ChangeOverviewRepository = new IpcRequest<undefined, undefined>(scope, 'overview/repository/change');
+export const ChangeOverviewRepositoryCommand = new IpcCommand<undefined>(scope, 'overview/repository/change');
+export const DidChangeOverviewRepository = new IpcNotification<undefined>(scope, 'overview/repository/didChange');
 
 // COMMANDS
 
@@ -320,3 +316,14 @@ export const DidChangeOverviewFilter = new IpcNotification<DidChangeOwnerFilterP
 );
 
 export const DidFocusAccount = new IpcNotification<undefined>(scope, 'account/didFocus');
+
+export interface BranchRef {
+	repoPath: string;
+	branchId: string;
+	branchName: string;
+}
+
+export interface BranchAndTargetRefs extends BranchRef {
+	mergeTargetId: string;
+	mergeTargetName: string;
+}

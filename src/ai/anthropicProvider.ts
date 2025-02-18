@@ -1,13 +1,12 @@
 import type { CancellationToken } from 'vscode';
 import type { AIModel } from './aiProviderService';
-import { getMaxCharacters } from './aiProviderService';
-import type { ChatMessage, SystemMessage } from './openAICompatibleProvider';
+import { getMaxCharacters, getValidatedTemperature } from './aiProviderService';
+import type { ChatMessage } from './openAICompatibleProvider';
 import { OpenAICompatibleProvider } from './openAICompatibleProvider';
 
 const provider = { id: 'anthropic', name: 'Anthropic' } as const;
 
 type AnthropicModel = AIModel<typeof provider.id>;
-
 const models: AnthropicModel[] = [
 	{
 		id: 'claude-3-5-sonnet-latest',
@@ -102,7 +101,7 @@ export class AnthropicProvider extends OpenAICompatibleProvider<typeof provider.
 	override async fetch(
 		model: AIModel<typeof provider.id>,
 		apiKey: string,
-		messages: (maxCodeCharacters: number, retries: number) => [SystemMessage, ...ChatMessage[]],
+		messages: (maxCodeCharacters: number, retries: number) => ChatMessage[],
 		outputTokens: number,
 		cancellation: CancellationToken | undefined,
 	): Promise<[result: string, maxCodeCharacters: number]> {
@@ -119,6 +118,7 @@ export class AnthropicProvider extends OpenAICompatibleProvider<typeof provider.
 				system: system.content,
 				stream: false,
 				max_tokens: Math.min(outputTokens, model.maxTokens.output),
+				temperature: getValidatedTemperature(model.temperature),
 			};
 
 			const rsp = await this.fetchCore(model, apiKey, request, cancellation);
@@ -128,7 +128,7 @@ export class AnthropicProvider extends OpenAICompatibleProvider<typeof provider.
 				}
 				if (rsp.status === 429) {
 					throw new Error(
-						`(${this.name}:${rsp.status}) Too many requests (rate limit exceeded) or your API key is associated with an expired trial`,
+						`(${this.name}) ${rsp.status}: Too many requests (rate limit exceeded) or your API key is associated with an expired trial`,
 					);
 				}
 
@@ -148,7 +148,7 @@ export class AnthropicProvider extends OpenAICompatibleProvider<typeof provider.
 					continue;
 				}
 
-				throw new Error(`(${this.name}:${rsp.status}) ${json?.error?.message || rsp.statusText})`);
+				throw new Error(`(${this.name}) ${rsp.status}: ${json?.error?.message || rsp.statusText})`);
 			}
 
 			const data: AnthropicMessageResponse = await rsp.json();

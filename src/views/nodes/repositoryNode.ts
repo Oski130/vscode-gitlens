@@ -3,19 +3,17 @@ import { GlyphChars } from '../../constants';
 import { Features } from '../../features';
 import type { GitUri } from '../../git/gitUri';
 import { GitBranch } from '../../git/models/branch';
-import { getHighlanderProviders } from '../../git/models/remote';
-import type { RepositoryChangeEvent, RepositoryFileSystemChangeEvent } from '../../git/models/repository';
-import { Repository, RepositoryChange, RepositoryChangeComparisonMode } from '../../git/models/repository';
+import type { Repository, RepositoryChangeEvent, RepositoryFileSystemChangeEvent } from '../../git/models/repository';
+import { RepositoryChange, RepositoryChangeComparisonMode } from '../../git/models/repository';
 import type { GitStatus } from '../../git/models/status';
-import { getRepositoryStatusIconPath } from '../../git/utils/icons';
-import type {
-	CloudWorkspace,
-	CloudWorkspaceRepositoryDescriptor,
-	LocalWorkspace,
-	LocalWorkspaceRepositoryDescriptor,
-} from '../../plus/workspaces/models';
+import { getRepositoryStatusIconPath } from '../../git/utils/-webview/icons';
+import { formatLastFetched } from '../../git/utils/-webview/repository.utils';
+import { getLastFetchedUpdateInterval } from '../../git/utils/fetch.utils';
+import { getHighlanderProviders } from '../../git/utils/remote.utils';
+import type { CloudWorkspace, CloudWorkspaceRepositoryDescriptor } from '../../plus/workspaces/models/cloudWorkspace';
+import type { LocalWorkspace, LocalWorkspaceRepositoryDescriptor } from '../../plus/workspaces/models/localWorkspace';
 import { findLastIndex } from '../../system/array';
-import { gate } from '../../system/decorators/gate';
+import { gate } from '../../system/decorators/-webview/gate';
 import { debug, log } from '../../system/decorators/log';
 import { weakEvent } from '../../system/event';
 import { disposableInterval } from '../../system/function';
@@ -31,8 +29,7 @@ import { BranchTrackingStatusNode } from './branchTrackingStatusNode';
 import { MessageNode } from './common';
 import { CompareBranchNode } from './compareBranchNode';
 import { ContributorsNode } from './contributorsNode';
-import { MergeStatusNode } from './mergeStatusNode';
-import { RebaseStatusNode } from './rebaseStatusNode';
+import { PausedOperationStatusNode } from './pausedOperationStatusNode';
 import { ReflogNode } from './reflogNode';
 import { RemotesNode } from './remotesNode';
 import { StashesNode } from './stashesNode';
@@ -55,7 +52,7 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 		this.updateContext({ ...context, repository: this.repo });
 		this._uniqueId = getViewNodeId(this.type, this.context);
 
-		this._status = this.repo.git.getStatus();
+		this._status = this.repo.git.status().getStatus();
 	}
 
 	override get id(): string {
@@ -99,15 +96,9 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 					status.rebasing,
 				);
 
-				const [mergeStatus, rebaseStatus] = await Promise.all([
-					this.view.container.git.getMergeStatus(status.repoPath),
-					this.view.container.git.getRebaseStatus(status.repoPath),
-				]);
-
-				if (mergeStatus != null) {
-					children.push(new MergeStatusNode(this.view, this, branch, mergeStatus, status, true));
-				} else if (rebaseStatus != null) {
-					children.push(new RebaseStatusNode(this.view, this, branch, rebaseStatus, status, true));
+				const pausedOpStatus = await this.repo.git.status().getPausedOperationStatus?.();
+				if (pausedOpStatus != null) {
+					children.push(new PausedOperationStatusNode(this.view, this, branch, pausedOpStatus, status, true));
 				} else if (this.view.config.showUpstreamStatus) {
 					if (status.upstream) {
 						if (!status.state.behind && !status.state.ahead) {
@@ -189,7 +180,11 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 			}
 
 			if (this.view.config.showContributors) {
-				children.push(new ContributorsNode(this.uri, this.view, this, this.repo));
+				children.push(
+					new ContributorsNode(this.uri, this.view, this, this.repo, {
+						stats: this.view.config.showContributorsStatistics,
+					}),
+				);
 			}
 
 			if (this.view.config.showIncomingActivity && !this.repo.provider.virtual) {
@@ -208,9 +203,7 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 
 		let description;
 		let tooltip = `${this.repo.formattedName ?? this.uri.repoPath ?? ''}${
-			lastFetched
-				? `${pad(GlyphChars.Dash, 2, 2)}Last fetched ${Repository.formatLastFetched(lastFetched, false)}`
-				: ''
+			lastFetched ? `${pad(GlyphChars.Dash, 2, 2)}Last fetched ${formatLastFetched(lastFetched, false)}` : ''
 		}${this.repo.formattedName ? `\\\n${this.uri.repoPath}` : ''}`;
 		let workingStatus = '';
 
@@ -255,9 +248,7 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 
 			let providerName;
 			if (status.upstream != null) {
-				const providers = getHighlanderProviders(
-					await this.view.container.git.getRemotesWithProviders(status.repoPath),
-				);
+				const providers = getHighlanderProviders(await this.repo.git.remotes().getRemotesWithProviders());
 				providerName = providers?.length ? providers[0].name : undefined;
 			} else {
 				const remote = await status.getRemote();
@@ -305,7 +296,7 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 		item.id = this.id;
 		item.contextValue = contextValue;
 		item.description = `${description ?? ''}${
-			lastFetched ? `${pad(GlyphChars.Dot, 1, 1)}Last fetched ${Repository.formatLastFetched(lastFetched)}` : ''
+			lastFetched ? `${pad(GlyphChars.Dot, 1, 1)}Last fetched ${formatLastFetched(lastFetched)}` : ''
 		}`;
 		item.iconPath = getRepositoryStatusIconPath(this.view.container, this.repo, status);
 
@@ -323,56 +314,56 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 	}
 
 	@log()
-	fetch(options: { all?: boolean; progress?: boolean; prune?: boolean; remote?: string } = {}) {
+	fetch(options: { all?: boolean; progress?: boolean; prune?: boolean; remote?: string }): Promise<void> {
 		return this.repo.fetch(options);
 	}
 
 	@log()
-	pull(options: { progress?: boolean; rebase?: boolean } = {}) {
+	pull(options: { progress?: boolean; rebase?: boolean }): Promise<void> {
 		return this.repo.pull(options);
 	}
 
 	@log()
-	push(options: { force?: boolean; progress?: boolean } = {}) {
+	push(options: { force?: boolean; progress?: boolean }): Promise<void> {
 		return this.repo.push(options);
 	}
 
 	@gate()
 	@debug()
-	override async refresh(reset: boolean = false) {
+	override async refresh(reset: boolean = false): Promise<void> {
 		super.refresh(reset);
 
 		if (reset) {
-			this._status = this.repo.git.getStatus();
+			this._status = this.repo.git.status().getStatus();
 		}
 
 		await this.ensureSubscription();
 	}
 
 	@log()
-	async star() {
+	async star(): Promise<void> {
 		await this.repo.star();
 		void this.parent!.triggerChange();
 	}
 
 	@log()
-	async unstar() {
+	async unstar(): Promise<void> {
 		await this.repo.unstar();
 		void this.parent!.triggerChange();
 	}
 
 	@debug()
-	protected async subscribe() {
+	protected async subscribe(): Promise<Disposable> {
 		const lastFetched = (await this.repo?.getLastFetched()) ?? 0;
 
 		const disposables = [weakEvent(this.repo.onDidChange, this.onRepositoryChanged, this)];
 
-		const interval = Repository.getLastFetchedUpdateInterval(lastFetched);
+		const interval = getLastFetchedUpdateInterval(lastFetched);
 		if (lastFetched !== 0 && interval > 0) {
 			disposables.push(
 				disposableInterval(() => {
 					// Check if the interval should change, and if so, reset it
-					if (interval !== Repository.getLastFetchedUpdateInterval(lastFetched)) {
+					if (interval !== getLastFetchedUpdateInterval(lastFetched)) {
 						void this.resetSubscription();
 					}
 
@@ -410,7 +401,7 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 		},
 	})
 	private async onFileSystemChanged(_e: RepositoryFileSystemChangeEvent) {
-		this._status = this.repo.git.getStatus();
+		this._status = this.repo.git.status().getStatus();
 
 		if (this.children !== undefined) {
 			const status = await this._status;
@@ -449,7 +440,7 @@ export class RepositoryNode extends SubscribeableViewNode<'repository', ViewsWit
 				RepositoryChange.Index,
 				RepositoryChange.Heads,
 				RepositoryChange.Opened,
-				RepositoryChange.Status,
+				RepositoryChange.PausedOperationStatus,
 				RepositoryChange.Unknown,
 				RepositoryChangeComparisonMode.Any,
 			)

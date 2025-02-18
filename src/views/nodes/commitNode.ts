@@ -10,13 +10,13 @@ import type { PullRequest } from '../../git/models/pullRequest';
 import type { GitRevisionReference } from '../../git/models/reference';
 import type { GitRemote } from '../../git/models/remote';
 import type { RemoteProvider } from '../../git/remotes/remoteProvider';
+import { configuration } from '../../system/-webview/configuration';
+import { getContext } from '../../system/-webview/context';
 import { makeHierarchical } from '../../system/array';
 import { joinPaths, normalizePath } from '../../system/path';
 import type { Deferred } from '../../system/promise';
 import { defer, getSettledValue, pauseOnCancelOrTimeoutMapTuplePromise } from '../../system/promise';
 import { sortCompare } from '../../system/string';
-import { configuration } from '../../system/vscode/configuration';
-import { getContext } from '../../system/vscode/context';
 import type { FileHistoryView } from '../fileHistoryView';
 import type { ViewsWithCommits } from '../viewBase';
 import { disposeChildren } from '../viewBase';
@@ -49,7 +49,7 @@ export class CommitNode extends ViewRefNode<'commit', ViewsWithCommits | FileHis
 		this._uniqueId = getViewNodeId(this.type, this.context);
 	}
 
-	override dispose() {
+	override dispose(): void {
 		super.dispose();
 		this.children = undefined;
 	}
@@ -213,7 +213,7 @@ export class CommitNode extends ViewRefNode<'commit', ViewsWithCommits | FileHis
 		};
 	}
 
-	override refresh(reset?: boolean) {
+	override refresh(reset?: boolean): void {
 		void super.refresh?.(reset);
 
 		this.children = undefined;
@@ -253,7 +253,7 @@ export class CommitNode extends ViewRefNode<'commit', ViewsWithCommits | FileHis
 
 	private async getTooltip(cancellation: CancellationToken) {
 		const [remotesResult, _] = await Promise.allSettled([
-			this.view.container.git.getBestRemotesWithProviders(this.commit.repoPath, cancellation),
+			this.view.container.git.remotes(this.commit.repoPath).getBestRemotesWithProviders(cancellation),
 			this.commit.ensureFullDetails({ include: { stats: true } }),
 		]);
 

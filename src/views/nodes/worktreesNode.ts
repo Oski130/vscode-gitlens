@@ -3,7 +3,7 @@ import { GlyphChars } from '../../constants';
 import { PlusFeatures } from '../../features';
 import type { GitUri } from '../../git/gitUri';
 import type { Repository } from '../../git/models/repository';
-import { sortWorktrees } from '../../git/utils/sorting';
+import { sortWorktrees } from '../../git/utils/-webview/sorting';
 import { filterMap } from '../../system/array';
 import { debug } from '../../system/decorators/log';
 import { map } from '../../system/iterable';
@@ -41,8 +41,8 @@ export class WorktreesNode extends CacheableChildrenViewNode<'worktrees', ViewsW
 			const access = await this.repo.access(PlusFeatures.Worktrees);
 			if (!access.allowed) return [];
 
-			const worktrees = await this.repo.git.getWorktrees();
-			if (worktrees.length === 0) return [new MessageNode(this.view, this, 'No worktrees could be found.')];
+			const worktrees = await this.repo.git.worktrees()?.getWorktrees();
+			if (!worktrees?.length) return [new MessageNode(this.view, this, 'No worktrees could be found.')];
 
 			this.children = filterMap(
 				await Promise.allSettled(
@@ -83,7 +83,7 @@ export class WorktreesNode extends CacheableChildrenViewNode<'worktrees', ViewsW
 	}
 
 	@debug()
-	override refresh() {
+	override refresh(): void {
 		super.refresh(true);
 	}
 }

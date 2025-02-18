@@ -10,6 +10,7 @@ import '../../../shared/components/button-container';
 import '../../../shared/components/code-icon';
 import '../../../shared/components/overlays/popover';
 import '../../../shared/components/promo';
+// import '../../../shared/components/snow';
 
 @customElement('gl-home-header')
 export class GLHomeHeader extends LitElement {
@@ -46,8 +47,14 @@ export class GLHomeHeader extends LitElement {
 				margin: 0 0.2rem 0.6rem;
 			}
 
-			gl-promo-banner:not([has-promo]) {
+			gl-promo-banner:has(gl-promo:not([has-promo])) {
 				display: none;
+			}
+
+			.group {
+				display: flex;
+				align-items: center;
+				gap: 0.4rem;
 			}
 		`,
 	];
@@ -55,16 +62,16 @@ export class GLHomeHeader extends LitElement {
 	@query('gl-account-chip')
 	private accountChip!: GLAccountChip;
 
-	override render() {
+	override render(): unknown {
 		return html`<gl-promo-banner></gl-promo-banner>
 			<div class="container" tabindex="-1">
-				<gl-account-chip></gl-account-chip>
+				<span class="group"><gl-account-chip></gl-account-chip></span>
 				<gl-integrations-chip></gl-integrations-chip>
 			</div>
 			<gl-onboarding></gl-onboarding>`;
 	}
 
-	show() {
+	show(): void {
 		this.accountChip.show();
 	}
 }

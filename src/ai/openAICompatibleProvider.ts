@@ -1,23 +1,28 @@
-import { fetch } from '@env/fetch';
 import type { CancellationToken } from 'vscode';
+import type { Response } from '@env/fetch';
+import { fetch } from '@env/fetch';
 import type { AIProviders } from '../constants.ai';
 import type { TelemetryEvents } from '../constants.telemetry';
 import type { Container } from '../container';
 import { CancellationError } from '../errors';
+import { configuration } from '../system/-webview/configuration';
 import { sum } from '../system/iterable';
 import { interpolate } from '../system/string';
-import { configuration } from '../system/vscode/configuration';
-import type { AIModel, AIProvider } from './aiProviderService';
-import { getMaxCharacters, getOrPromptApiKey, showDiffTruncationWarning } from './aiProviderService';
+import type { AIGenerateChangelogChange, AIModel, AIProvider } from './aiProviderService';
 import {
-	explainChangesSystemPrompt,
+	getMaxCharacters,
+	getOrPromptApiKey,
+	getValidatedTemperature,
+	showDiffTruncationWarning,
+	showPromptTruncationWarning,
+} from './aiProviderService';
+import {
 	explainChangesUserPrompt,
-	generateCloudPatchMessageSystemPrompt,
+	generateChangelogUserPrompt,
 	generateCloudPatchMessageUserPrompt,
-	generateCodeSuggestMessageSystemPrompt,
 	generateCodeSuggestMessageUserPrompt,
-	generateCommitMessageSystemPrompt,
 	generateCommitMessageUserPrompt,
+	generateStashMessageUserPrompt,
 } from './prompts';
 
 export interface AIProviderConfig {
@@ -29,7 +34,7 @@ export interface AIProviderConfig {
 export abstract class OpenAICompatibleProvider<T extends AIProviders> implements AIProvider<T> {
 	constructor(protected readonly container: Container) {}
 
-	dispose() {}
+	dispose(): void {}
 
 	abstract readonly id: T;
 	abstract readonly name: string;
@@ -62,8 +67,7 @@ export abstract class OpenAICompatibleProvider<T extends AIProviders> implements
 		diff: string,
 		reporting: TelemetryEvents['ai/generate'],
 		promptConfig: {
-			type: 'commit' | 'cloud-patch' | 'code-suggestion';
-			systemPrompt: string;
+			type: 'commit' | 'cloud-patch' | 'code-suggestion' | 'stash';
 			userPrompt: string;
 			customInstructions?: string;
 		},
@@ -76,11 +80,7 @@ export abstract class OpenAICompatibleProvider<T extends AIProviders> implements
 			const [result, maxCodeCharacters] = await this.fetch(
 				model,
 				apiKey,
-				(max, retries): [SystemMessage, ...ChatMessage[]] => {
-					const system: SystemMessage = {
-						role: 'system',
-						content: promptConfig.systemPrompt,
-					};
+				(max, retries): ChatMessage[] => {
 					const messages: ChatMessage[] = [
 						{
 							role: 'user',
@@ -93,10 +93,9 @@ export abstract class OpenAICompatibleProvider<T extends AIProviders> implements
 					];
 
 					reporting['retry.count'] = retries;
-					reporting['input.length'] =
-						(reporting['input.length'] ?? 0) + sum([system, ...messages], m => m.content.length);
+					reporting['input.length'] = (reporting['input.length'] ?? 0) + sum(messages, m => m.content.length);
 
-					return [system, ...messages];
+					return messages;
 				},
 				4096,
 				options?.cancellation,
@@ -134,13 +133,11 @@ export abstract class OpenAICompatibleProvider<T extends AIProviders> implements
 			codeSuggestion
 				? {
 						type: 'code-suggestion',
-						systemPrompt: generateCodeSuggestMessageSystemPrompt,
 						userPrompt: generateCodeSuggestMessageUserPrompt,
 						customInstructions: configuration.get('ai.generateCodeSuggestMessage.customInstructions'),
 				  }
 				: {
 						type: 'cloud-patch',
-						systemPrompt: generateCloudPatchMessageSystemPrompt,
 						userPrompt: generateCloudPatchMessageUserPrompt,
 						customInstructions: configuration.get('ai.generateCloudPatchMessage.customInstructions'),
 				  },
@@ -160,12 +157,75 @@ export abstract class OpenAICompatibleProvider<T extends AIProviders> implements
 			reporting,
 			{
 				type: 'commit',
-				systemPrompt: generateCommitMessageSystemPrompt,
 				userPrompt: generateCommitMessageUserPrompt,
 				customInstructions: configuration.get('ai.generateCommitMessage.customInstructions'),
 			},
 			options,
 		);
+	}
+
+	async generateStashMessage(
+		model: AIModel<T>,
+		diff: string,
+		reporting: TelemetryEvents['ai/generate'],
+		options?: { cancellation?: CancellationToken; context?: string },
+	): Promise<string | undefined> {
+		return this.generateMessage(
+			model,
+			diff,
+			reporting,
+			{
+				type: 'stash',
+				userPrompt: generateStashMessageUserPrompt,
+				customInstructions: configuration.get('ai.generateStashMessage.customInstructions'),
+			},
+			options,
+		);
+	}
+
+	async generateChangelog(
+		model: AIModel<T>,
+		changes: AIGenerateChangelogChange[],
+		reporting: TelemetryEvents['ai/generate'],
+		options?: { cancellation?: CancellationToken },
+	): Promise<string | undefined> {
+		const apiKey = await this.getApiKey();
+		if (apiKey == null) return undefined;
+
+		try {
+			const data = JSON.stringify(changes);
+
+			const [result, maxCodeCharacters] = await this.fetch(
+				model,
+				apiKey,
+				(max, retries): ChatMessage[] => {
+					const messages: ChatMessage[] = [
+						{
+							role: 'user',
+							content: interpolate(generateChangelogUserPrompt, {
+								data: data.substring(0, max),
+								instructions: configuration.get('ai.generateChangelog.customInstructions') ?? '',
+							}),
+						},
+					];
+
+					reporting['retry.count'] = retries;
+					reporting['input.length'] = (reporting['input.length'] ?? 0) + sum(messages, m => m.content.length);
+
+					return messages;
+				},
+				4096,
+				options?.cancellation,
+			);
+
+			if (data.length > maxCodeCharacters) {
+				showPromptTruncationWarning(maxCodeCharacters, model);
+			}
+
+			return result;
+		} catch (ex) {
+			throw new Error(`Unable to generate changelog: ${ex.message}`);
+		}
 	}
 
 	async explainChanges(
@@ -182,11 +242,7 @@ export abstract class OpenAICompatibleProvider<T extends AIProviders> implements
 			const [result, maxCodeCharacters] = await this.fetch(
 				model,
 				apiKey,
-				(max, retries): [SystemMessage, ...ChatMessage[]] => {
-					const system: SystemMessage = {
-						role: 'system',
-						content: explainChangesSystemPrompt,
-					};
+				(max, retries): ChatMessage[] => {
 					const messages: ChatMessage[] = [
 						{
 							role: 'user',
@@ -199,10 +255,9 @@ export abstract class OpenAICompatibleProvider<T extends AIProviders> implements
 					];
 
 					reporting['retry.count'] = retries;
-					reporting['input.length'] =
-						(reporting['input.length'] ?? 0) + sum([system, ...messages], m => m.content.length);
+					reporting['input.length'] = (reporting['input.length'] ?? 0) + sum(messages, m => m.content.length);
 
-					return [system, ...messages];
+					return messages;
 				},
 				4096,
 				options?.cancellation,
@@ -221,7 +276,7 @@ export abstract class OpenAICompatibleProvider<T extends AIProviders> implements
 	protected async fetch(
 		model: AIModel<T>,
 		apiKey: string,
-		messages: (maxCodeCharacters: number, retries: number) => [SystemMessage, ...ChatMessage[]],
+		messages: (maxCodeCharacters: number, retries: number) => ChatMessage[],
 		outputTokens: number,
 		cancellation: CancellationToken | undefined,
 	): Promise<[result: string, maxCodeCharacters: number]> {
@@ -233,33 +288,18 @@ export abstract class OpenAICompatibleProvider<T extends AIProviders> implements
 				model: model.id,
 				messages: messages(maxCodeCharacters, retries),
 				stream: false,
-				max_tokens: Math.min(outputTokens, model.maxTokens.output),
+				max_completion_tokens: Math.min(outputTokens, model.maxTokens.output),
+				temperature: getValidatedTemperature(model.temperature),
 			};
 
 			const rsp = await this.fetchCore(model, apiKey, request, cancellation);
 			if (!rsp.ok) {
-				if (rsp.status === 404) {
-					throw new Error(`Your API key doesn't seem to have access to the selected '${model.id}' model`);
-				}
-				if (rsp.status === 429) {
-					throw new Error(
-						`(${this.name}:${rsp.status}) Too many requests (rate limit exceeded) or your API key is associated with an expired trial`,
-					);
-				}
-
-				let json;
-				try {
-					json = (await rsp.json()) as { error?: { code: string; message: string } } | undefined;
-				} catch {}
-
-				debugger;
-
-				if (retries++ < 2 && json?.error?.code === 'context_length_exceeded') {
-					maxCodeCharacters -= 500 * retries;
+				const result = await this.handleFetchFailure(rsp, model, retries, maxCodeCharacters);
+				if (result.retry) {
+					maxCodeCharacters = result.maxCodeCharacters;
+					retries++;
 					continue;
 				}
-
-				throw new Error(`(${this.name}:${rsp.status}) ${json?.error?.message || rsp.statusText}`);
 			}
 
 			const data: ChatCompletionResponse = await rsp.json();
@@ -268,12 +308,39 @@ export abstract class OpenAICompatibleProvider<T extends AIProviders> implements
 		}
 	}
 
+	protected async handleFetchFailure(
+		rsp: Response,
+		model: AIModel<T>,
+		retries: number,
+		maxCodeCharacters: number,
+	): Promise<{ retry: boolean; maxCodeCharacters: number }> {
+		if (rsp.status === 404) {
+			throw new Error(`Your API key doesn't seem to have access to the selected '${model.id}' model`);
+		}
+		if (rsp.status === 429) {
+			throw new Error(
+				`(${this.name}) ${rsp.status}: Too many requests (rate limit exceeded) or your account is out of funds`,
+			);
+		}
+
+		let json;
+		try {
+			json = (await rsp.json()) as { error?: { code: string; message: string } } | undefined;
+		} catch {}
+
+		if (retries < 2 && json?.error?.code === 'context_length_exceeded') {
+			return { retry: true, maxCodeCharacters: maxCodeCharacters - 500 };
+		}
+
+		throw new Error(`(${this.name}) ${rsp.status}: ${json?.error?.message || rsp.statusText}`);
+	}
+
 	protected async fetchCore(
 		model: AIModel<T>,
 		apiKey: string,
 		request: object,
 		cancellation: CancellationToken | undefined,
-	) {
+	): Promise<Response> {
 		let aborter: AbortController | undefined;
 		if (cancellation != null) {
 			aborter = new AbortController();
@@ -313,7 +380,7 @@ interface ChatCompletionRequest {
 
 	frequency_penalty?: number;
 	logit_bias?: Record<string, number>;
-	max_tokens?: number;
+	max_completion_tokens?: number;
 	n?: number;
 	presence_penalty?: number;
 	stop?: string | string[];

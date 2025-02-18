@@ -1,9 +1,9 @@
 import { ThemeIcon, TreeItem, TreeItemCollapsibleState } from 'vscode';
 import { GitUri } from '../../git/gitUri';
 import type { GitBranch } from '../../git/models/branch';
-import { getLocalBranchUpstreamNames } from '../../git/models/branch.utils';
 import type { Repository } from '../../git/models/repository';
-import { getOpenedWorktreesByBranch } from '../../git/models/worktree.utils';
+import { getOpenedWorktreesByBranch } from '../../git/utils/-webview/worktree.utils';
+import { getLocalBranchUpstreamNames } from '../../git/utils/branch.utils';
 import { makeHierarchical } from '../../system/array';
 import { debug } from '../../system/decorators/log';
 import { PageableResult } from '../../system/paging';
@@ -39,9 +39,11 @@ export class BranchesNode extends CacheableChildrenViewNode<'branches', ViewsWit
 	async getChildren(): Promise<ViewNode[]> {
 		if (this.children == null) {
 			const showRemoteBranches = this.view.type === 'branches' && this.view.config.showRemoteBranches;
-			const defaultRemote = showRemoteBranches ? (await this.repo.git.getDefaultRemote())?.name : undefined;
+			const defaultRemote = showRemoteBranches
+				? (await this.repo.git.remotes().getDefaultRemote())?.name
+				: undefined;
 
-			const options: Parameters<typeof this.repo.git.getBranches>['0'] = {
+			const options: Parameters<ReturnType<typeof this.repo.git.branches>['getBranches']>['0'] = {
 				// only show local branches or remote branches for the default remote
 				filter: b =>
 					!b.remote || (showRemoteBranches && defaultRemote != null && b.getRemoteName() === defaultRemote),
@@ -54,7 +56,9 @@ export class BranchesNode extends CacheableChildrenViewNode<'branches', ViewsWit
 					: { current: false, groupByType: defaultRemote == null },
 			};
 
-			const branches = new PageableResult<GitBranch>(p => this.repo.git.getBranches({ ...options, paging: p }));
+			const branches = new PageableResult<GitBranch>(p =>
+				this.repo.git.branches().getBranches({ ...options, paging: p }),
+			);
 
 			let localUpstreamNames: Set<string> | undefined;
 			// Filter out remote branches that have a local branch
@@ -111,7 +115,7 @@ export class BranchesNode extends CacheableChildrenViewNode<'branches', ViewsWit
 		const item = new TreeItem('Branches', TreeItemCollapsibleState.Collapsed);
 		item.id = this.id;
 		item.contextValue = ContextValues.Branches;
-		if ((await this.repo.git.getRemotes()).length) {
+		if ((await this.repo.git.remotes().getRemotes()).length) {
 			item.contextValue += '+remotes';
 		}
 		// TODO@axosoft-ramint Temporary workaround, remove when our git commands work on closed repos.
@@ -124,7 +128,7 @@ export class BranchesNode extends CacheableChildrenViewNode<'branches', ViewsWit
 	}
 
 	@debug()
-	override refresh() {
+	override refresh(): void {
 		super.refresh(true);
 	}
 }

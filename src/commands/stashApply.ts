@@ -1,12 +1,12 @@
-import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import { apply, pop } from '../git/actions/stash';
 import type { GitStashCommit } from '../git/models/commit';
 import type { GitStashReference } from '../git/models/reference';
 import type { CommandQuickPickItem } from '../quickpicks/items/common';
-import { command } from '../system/vscode/command';
-import type { CommandContext } from './base';
-import { GlCommandBase, isCommandContextViewNodeHasCommit, isCommandContextViewNodeHasRepository } from './base';
+import { command } from '../system/-webview/command';
+import { GlCommandBase } from './commandBase';
+import type { CommandContext } from './commandContext';
+import { isCommandContextViewNodeHasCommit, isCommandContextViewNodeHasRepository } from './commandContext.utils';
 
 export interface StashApplyCommandArgs {
 	deleteAfter?: boolean;
@@ -19,10 +19,10 @@ export interface StashApplyCommandArgs {
 @command()
 export class StashApplyCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super(GlCommand.StashApply);
+		super('gitlens.stashApply');
 	}
 
-	protected override async preExecute(context: CommandContext, args?: StashApplyCommandArgs) {
+	protected override async preExecute(context: CommandContext, args?: StashApplyCommandArgs): Promise<void> {
 		if (isCommandContextViewNodeHasCommit<GitStashCommit>(context)) {
 			if (context.node.commit.message == null) {
 				await context.node.commit.ensureFullDetails();
@@ -35,7 +35,7 @@ export class StashApplyCommand extends GlCommandBase {
 		return this.execute(args);
 	}
 
-	async execute(args?: StashApplyCommandArgs) {
+	async execute(args?: StashApplyCommandArgs): Promise<void> {
 		if (args?.deleteAfter) {
 			return pop(args?.repoPath ?? args?.stashItem?.repoPath, args?.stashItem);
 		}

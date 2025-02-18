@@ -26,14 +26,14 @@ import type { GitUri } from '../git/gitUri';
 import type { GitBlame } from '../git/models/blame';
 import type { GitCommit } from '../git/models/commit';
 import { RemoteResourceType } from '../git/models/remoteResource';
+import { createCommand, executeCoreCommand } from '../system/-webview/command';
+import { configuration } from '../system/-webview/configuration';
+import { isVirtualUri } from '../system/-webview/vscode';
 import { is, once } from '../system/function';
 import { filterMap, find, first, join, map } from '../system/iterable';
 import { getLoggableName, Logger } from '../system/logger';
 import { startLogScope } from '../system/logger.scope';
 import { pluralize } from '../system/string';
-import { createCommand, executeCoreCommand } from '../system/vscode/command';
-import { configuration } from '../system/vscode/configuration';
-import { isVirtualUri } from '../system/vscode/utils';
 
 class GitRecentChangeCodeLens extends CodeLens {
 	constructor(
@@ -85,7 +85,7 @@ export class GitCodeLensProvider implements CodeLensProvider {
 
 	constructor(private readonly container: Container) {}
 
-	reset() {
+	reset(): void {
 		this._onDidChangeCodeLenses.fire();
 	}
 
@@ -760,7 +760,7 @@ function applyToggleFileBlameCommand<T extends GitRecentChangeCodeLens | GitAuth
 	title: string,
 	lens: T,
 ): T {
-	lens.command = createCommand<[Uri]>(GlCommand.ToggleFileBlame, title, lens.uri!.toFileUri());
+	lens.command = createCommand<[Uri]>('gitlens.toggleFileBlame', title, lens.uri!.toFileUri());
 	return lens;
 }
 
@@ -771,7 +771,7 @@ function applyToggleFileChangesCommand<T extends GitRecentChangeCodeLens | GitAu
 	only?: boolean,
 ): T {
 	lens.command = createCommand<[Uri, ToggleFileChangesAnnotationCommandArgs]>(
-		GlCommand.ToggleFileChanges,
+		'gitlens.toggleFileChanges',
 		title,
 		lens.uri!.toFileUri(),
 		{
@@ -786,7 +786,7 @@ function applyToggleFileHeatmapCommand<T extends GitRecentChangeCodeLens | GitAu
 	title: string,
 	lens: T,
 ): T {
-	lens.command = createCommand<[Uri]>(GlCommand.ToggleFileHeatmap, title, lens.uri!.toFileUri());
+	lens.command = createCommand<[Uri]>('gitlens.toggleFileHeatmap', title, lens.uri!.toFileUri());
 	return lens;
 }
 

@@ -1,11 +1,12 @@
 import type { AuthenticationSession, CancellationToken } from 'vscode';
-import type { AutolinkReference, DynamicAutolinkReference } from '../../../autolinks';
+import type { AutolinkReference, DynamicAutolinkReference } from '../../../autolinks/models/autolinks';
 import { IssueIntegrationId } from '../../../constants.integrations';
 import type { Account } from '../../../git/models/author';
-import type { Issue, IssueOrPullRequest, SearchedIssue } from '../../../git/models/issue';
+import type { Issue, SearchedIssue } from '../../../git/models/issue';
+import type { IssueOrPullRequest } from '../../../git/models/issueOrPullRequest';
 import { filterMap, flatten } from '../../../system/iterable';
 import { Logger } from '../../../system/logger';
-import type { IntegrationAuthenticationProviderDescriptor } from '../authentication/integrationAuthentication';
+import type { IntegrationAuthenticationProviderDescriptor } from '../authentication/integrationAuthenticationProvider';
 import type { IssueResourceDescriptor } from '../integration';
 import { IssueIntegration } from '../integration';
 import { IssueFilter, providersMetadata, toAccount, toSearchedIssue } from './models';
@@ -331,7 +332,7 @@ export class JiraIntegration extends IssueIntegration<IssueIntegrationId.Jira> {
 			const projects = this._projects.get(projectKey);
 			if (projects == null) {
 				this._projects.set(projectKey, [project]);
-			} else {
+			} else if (!projects.some(p => p.id === project.id)) {
 				projects.push(project);
 			}
 		}

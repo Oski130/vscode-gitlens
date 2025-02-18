@@ -1,6 +1,6 @@
 import type { CancellationToken, TextDocument } from 'vscode';
 import { MarkdownString } from 'vscode';
-import type { EnrichedAutolink } from '../autolinks';
+import type { EnrichedAutolink } from '../autolinks/models/autolinks';
 import { DiffWithCommand } from '../commands/diffWith';
 import { ShowQuickCommitCommand } from '../commands/showQuickCommit';
 import { GlyphChars } from '../constants';
@@ -12,10 +12,10 @@ import type { GitDiffHunk, GitDiffLine } from '../git/models/diff';
 import type { PullRequest } from '../git/models/pullRequest';
 import type { GitRemote } from '../git/models/remote';
 import { uncommittedStaged } from '../git/models/revision';
-import { isUncommittedStaged, shortenRevision } from '../git/models/revision.utils';
 import type { RemoteProvider } from '../git/remotes/remoteProvider';
+import { isUncommittedStaged, shortenRevision } from '../git/utils/revision.utils';
+import { configuration } from '../system/-webview/configuration';
 import { getSettledValue, pauseOnCancelOrTimeout, pauseOnCancelOrTimeoutMapTuplePromise } from '../system/promise';
-import { configuration } from '../system/vscode/configuration';
 
 export async function changesMessage(
 	container: Container,
@@ -212,7 +212,7 @@ export async function detailsMessage(
 	}>,
 ): Promise<MarkdownString | undefined> {
 	const remotesResult = await pauseOnCancelOrTimeout(
-		options?.remotes ?? container.git.getBestRemotesWithProviders(commit.repoPath),
+		options?.remotes ?? container.git.remotes(commit.repoPath).getBestRemotesWithProviders(),
 		options?.cancellation,
 		options?.timeout,
 	);

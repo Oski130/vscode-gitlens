@@ -1,9 +1,9 @@
 import type { Range, Uri } from 'vscode';
-import type { AutolinkReference, DynamicAutolinkReference } from '../../autolinks';
-import type { GkProviderId } from '../../gk/models/repositoryIdentities';
+import type { AutolinkReference, DynamicAutolinkReference } from '../../autolinks/models/autolinks';
 import type { Brand, Unbrand } from '../../system/brand';
 import type { Repository } from '../models/repository';
-import { isSha } from '../models/revision.utils';
+import type { GkProviderId } from '../models/repositoryIdentities';
+import { isSha } from '../utils/revision.utils';
 import type { RemoteProviderId } from './remoteProvider';
 import { RemoteProvider } from './remoteProvider';
 
@@ -64,7 +64,7 @@ export class BitbucketServerRemote extends RemoteProvider {
 		return super.splitPath();
 	}
 
-	override get icon() {
+	override get icon(): string {
 		return 'bitbucket';
 	}
 
@@ -76,7 +76,7 @@ export class BitbucketServerRemote extends RemoteProvider {
 		return 'bitbucketServer' satisfies Unbrand<GkProviderId> as Brand<GkProviderId>;
 	}
 
-	get name() {
+	get name(): string {
 		return this.formatName('Bitbucket Server');
 	}
 
@@ -130,7 +130,7 @@ export class BitbucketServerRemote extends RemoteProvider {
 		} while (index > 0);
 
 		if (possibleBranches.size !== 0) {
-			const { values: branches } = await repository.git.getBranches({
+			const { values: branches } = await repository.git.branches().getBranches({
 				filter: b => b.remote && possibleBranches.has(b.getNameWithoutRemote()),
 			});
 			for (const branch of branches) {

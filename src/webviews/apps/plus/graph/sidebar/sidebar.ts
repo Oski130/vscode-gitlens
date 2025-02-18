@@ -3,8 +3,8 @@ import { Task } from '@lit/task';
 import { css, html, LitElement, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
-import { DidChangeNotification, GetCountsRequest } from '../../../../../plus/webviews/graph/protocol';
-import { ipcContext } from '../../../shared/context';
+import { DidChangeNotification, GetCountsRequest } from '../../../../plus/graph/protocol';
+import { ipcContext } from '../../../shared/contexts/ipc';
 import type { Disposable } from '../../../shared/events';
 import type { HostIpc } from '../../../shared/ipc';
 import '../../../shared/components/code-icon';
@@ -87,7 +87,7 @@ export class GlGraphSideBar extends LitElement {
 		autoRun: false,
 	});
 
-	override connectedCallback() {
+	override connectedCallback(): void {
 		super.connectedCallback();
 
 		this._disposable = this._ipc.onReceiveMessage(msg => {
@@ -105,7 +105,7 @@ export class GlGraphSideBar extends LitElement {
 		});
 	}
 
-	override disconnectedCallback() {
+	override disconnectedCallback(): void {
 		super.disconnectedCallback();
 
 		this._disposable?.dispose();
@@ -128,7 +128,7 @@ export class GlGraphSideBar extends LitElement {
 		return this._counts;
 	}
 
-	override render() {
+	override render(): unknown {
 		if (!this.enabled) return nothing;
 
 		if (this._counts == null) {

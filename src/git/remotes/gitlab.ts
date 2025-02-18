@@ -1,17 +1,22 @@
 import type { Range, Uri } from 'vscode';
-import type { Autolink, AutolinkReference, DynamicAutolinkReference, MaybeEnrichedAutolink } from '../../autolinks';
+import type {
+	Autolink,
+	AutolinkReference,
+	DynamicAutolinkReference,
+	MaybeEnrichedAutolink,
+} from '../../autolinks/models/autolinks';
 import { GlyphChars } from '../../constants';
-import type { GkProviderId } from '../../gk/models/repositoryIdentities';
 import type { GitLabRepositoryDescriptor } from '../../plus/integrations/providers/gitlab';
 import type { Brand, Unbrand } from '../../system/brand';
 import { fromNow } from '../../system/date';
-import { memoize } from '../../system/decorators/memoize';
+import { memoize } from '../../system/decorators/-webview/memoize';
 import { encodeUrl } from '../../system/encoding';
 import { escapeMarkdown, unescapeMarkdown } from '../../system/markdown';
 import { equalsIgnoreCase } from '../../system/string';
 import type { Repository } from '../models/repository';
-import { isSha } from '../models/revision.utils';
-import { getIssueOrPullRequestMarkdownIcon } from '../utils/icons';
+import type { GkProviderId } from '../models/repositoryIdentities';
+import { getIssueOrPullRequestMarkdownIcon } from '../utils/-webview/icons';
+import { isSha } from '../utils/revision.utils';
 import type { RemoteProviderId } from './remoteProvider';
 import { RemoteProvider } from './remoteProvider';
 
@@ -29,7 +34,7 @@ export class GitLabRemote extends RemoteProvider<GitLabRepositoryDescriptor> {
 		super(domain, path, protocol, name, custom);
 	}
 
-	get apiBaseUrl() {
+	get apiBaseUrl(): string {
 		return this.custom ? `${this.protocol}://${this.domain}/api` : `https://${this.domain}/api`;
 	}
 
@@ -266,7 +271,7 @@ export class GitLabRemote extends RemoteProvider<GitLabRepositoryDescriptor> {
 		return this._autolinks;
 	}
 
-	override get icon() {
+	override get icon(): string {
 		return 'gitlab';
 	}
 
@@ -280,7 +285,7 @@ export class GitLabRemote extends RemoteProvider<GitLabRepositoryDescriptor> {
 			: 'gitlab') satisfies Unbrand<GkProviderId> as Brand<GkProviderId>;
 	}
 
-	get name() {
+	get name(): string {
 		return this.formatName('GitLab');
 	}
 
@@ -340,7 +345,7 @@ export class GitLabRemote extends RemoteProvider<GitLabRepositoryDescriptor> {
 		} while (index > 0);
 
 		if (possibleBranches.size !== 0) {
-			const { values: branches } = await repository.git.getBranches({
+			const { values: branches } = await repository.git.branches().getBranches({
 				filter: b => b.remote && possibleBranches.has(b.getNameWithoutRemote()),
 			});
 			for (const branch of branches) {

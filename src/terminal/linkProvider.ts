@@ -4,15 +4,15 @@ import type { GitWizardCommandArgs } from '../commands/gitWizard';
 import type { InspectCommandArgs } from '../commands/inspect';
 import type { ShowQuickBranchHistoryCommandArgs } from '../commands/showQuickBranchHistory';
 import type { ShowQuickCommitCommandArgs } from '../commands/showQuickCommit';
-import type { Commands } from '../constants.commands';
+import type { GlCommands } from '../constants.commands';
 import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import type { PagedResult } from '../git/gitProvider';
 import type { GitBranch } from '../git/models/branch';
-import { getBranchNameWithoutRemote } from '../git/models/branch.utils';
-import { createReference } from '../git/models/reference.utils';
 import type { GitTag } from '../git/models/tag';
-import { configuration } from '../system/vscode/configuration';
+import { getBranchNameWithoutRemote } from '../git/utils/branch.utils';
+import { createReference } from '../git/utils/reference.utils';
+import { configuration } from '../system/-webview/configuration';
 
 const commandsRegexShared =
 	/\b(g(?:it)?\b\s*)\b(branch|checkout|cherry-pick|fetch|grep|log|merge|pull|push|rebase|reset|revert|show|stash|status|tag)\b/gi;
@@ -24,7 +24,7 @@ const shaRegex = /^[0-9a-f]{7,40}$/;
 
 interface GitTerminalLink<T = object> extends TerminalLink {
 	command: {
-		command: Commands;
+		command: GlCommands;
 		args: T;
 	};
 }
@@ -36,7 +36,7 @@ export class GitTerminalLinkProvider implements Disposable, TerminalLinkProvider
 		this.disposable = window.registerTerminalLinkProvider(this);
 	}
 
-	dispose() {
+	dispose(): void {
 		this.disposable.dispose();
 	}
 
@@ -101,7 +101,7 @@ export class GitTerminalLinkProvider implements Disposable, TerminalLinkProvider
 			}
 
 			if (branchResults === undefined) {
-				branchResults = await this.container.git.getBranches(repoPath);
+				branchResults = await this.container.git.branches(repoPath).getBranches();
 				// TODO@eamodio handle paging
 			}
 
@@ -125,7 +125,7 @@ export class GitTerminalLinkProvider implements Disposable, TerminalLinkProvider
 			}
 
 			if (tagResults === undefined) {
-				tagResults = await this.container.git.getTags(repoPath);
+				tagResults = await this.container.git.tags(repoPath).getTags();
 				// TODO@eamodio handle paging
 			}
 
@@ -168,7 +168,7 @@ export class GitTerminalLinkProvider implements Disposable, TerminalLinkProvider
 				continue;
 			}
 
-			if (await this.container.git.validateReference(repoPath, ref)) {
+			if (await this.container.git.refs(repoPath).validateReference(ref)) {
 				const link: GitTerminalLink<ShowQuickCommitCommandArgs | InspectCommandArgs> = {
 					startIndex: match.index,
 					length: ref.length,

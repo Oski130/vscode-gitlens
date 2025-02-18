@@ -1,17 +1,17 @@
 import type { Config, GraphBranchesVisibility, GraphConfig } from './config';
 import type { WalkthroughSteps } from './constants';
-import type { AIModels, AIProviders } from './constants.ai';
-import type { GlCommand } from './constants.commands';
+import type { AIProviders } from './constants.ai';
+import type { GlCommands } from './constants.commands';
 import type { IntegrationId, SupportedCloudIntegrationIds } from './constants.integrations';
 import type { SubscriptionState, SubscriptionStateString } from './constants.subscription';
 import type { CustomEditorTypes, TreeViewTypes, WebviewTypes, WebviewViewTypes } from './constants.views';
 import type { FeaturePreviews, FeaturePreviewStatus } from './features';
 import type { GitContributionTiers } from './git/models/contributor';
-import type { Subscription, SubscriptionAccount } from './plus/gk/account/subscription';
-import type { GraphColumnConfig } from './plus/webviews/graph/protocol';
-import type { Period } from './plus/webviews/timeline/protocol';
+import type { Subscription, SubscriptionAccount } from './plus/gk/models/subscription';
 import type { Flatten } from './system/object';
 import type { WalkthroughContextKeys } from './telemetry/walkthroughStateProvider';
+import type { GraphColumnConfig } from './webviews/plus/graph/protocol';
+import type { Period } from './webviews/plus/timeline/protocol';
 
 export declare type AttributeValue =
 	| string
@@ -26,6 +26,8 @@ export interface TelemetryGlobalContext extends SubscriptionEventData {
 	'cloudIntegrations.connected.count': number;
 	'cloudIntegrations.connected.ids': string;
 	debugging: boolean;
+	/** Cohort number between 1 and 100 to use for percentage-based rollouts */
+	'device.cohort': number;
 	enabled: boolean;
 	prerelease: boolean;
 	install: boolean;
@@ -144,6 +146,8 @@ export interface TelemetryEvents extends WebviewShowAbortedEvents, WebviewShownE
 	/** Sent when the user changes the selected tab (mode) on the Graph Details view */
 	'graphDetails/mode/changed': GraphDetailsModeChangedEvent;
 
+	/** Sent when a Home command is executed */
+	'home/command': CommandEventData;
 	/** Sent when the new Home view preview is toggled on/off */
 	'home/preview/toggled': HomePreviewToggledEvent;
 	/** Sent when the user chooses to create a branch from the home view */
@@ -179,6 +183,9 @@ export interface TelemetryEvents extends WebviewShowAbortedEvents, WebviewShownE
 
 	/** Sent when a PR review was started in the inspect overview */
 	openReviewMode: OpenReviewModeEvent;
+
+	/** Sent when fetching the product config fails */
+	'productConfig/failed': ProductConfigFailedEvent;
 
 	/** Sent when the "context" of the workspace changes (e.g. repo added, integration connected, etc) */
 	'providers/context': void;
@@ -286,7 +293,7 @@ interface AccountValidationFailedEvent {
 	'account.id': string;
 	exception: string;
 	code: string | undefined;
-	statusCode: string | undefined;
+	statusCode: number | undefined;
 }
 
 interface ActivateEvent extends ConfigEventData {
@@ -295,7 +302,7 @@ interface ActivateEvent extends ConfigEventData {
 }
 
 interface AIEventDataBase {
-	'model.id': AIModels;
+	'model.id': string;
 	'model.provider.id': AIProviders;
 	'model.provider.name': string;
 	'retry.count': number;
@@ -320,7 +327,19 @@ export interface AIGenerateDraftEventData extends AIEventDataBase {
 	draftType: 'patch' | 'stash' | 'suggested_pr_change';
 }
 
-type AIGenerateEvent = AIGenerateCommitEventData | AIGenerateDraftEventData;
+export interface AIGenerateStashEventData extends AIEventDataBase {
+	type: 'stashMessage';
+}
+
+export interface AIGenerateChangelogEventData extends AIEventDataBase {
+	type: 'changelog';
+}
+
+type AIGenerateEvent =
+	| AIGenerateCommitEventData
+	| AIGenerateDraftEventData
+	| AIGenerateStashEventData
+	| AIGenerateChangelogEventData;
 
 interface CloudIntegrationsConnectingEvent {
 	'integration.ids': string | undefined;
@@ -421,7 +440,7 @@ interface CommandEventData {
 }
 
 interface GitCommandEventData {
-	command: GlCommand.GitCommands;
+	command: Extract<GlCommands, 'gitlens.gitCommands'>;
 	'context.mode'?: string;
 	'context.submode'?: string;
 	webview?: string;
@@ -652,6 +671,13 @@ interface OpenReviewModeEvent {
 	source: Sources;
 }
 
+interface ProductConfigFailedEvent {
+	reason: 'fetch' | 'validation';
+	json: string | undefined;
+	exception?: string;
+	statusCode?: number | undefined;
+}
+
 interface ProvidersRegistrationCompleteEvent {
 	'config.git.autoRepositoryDetection': boolean | 'subFolders' | 'openEditors' | undefined;
 }
@@ -763,9 +789,12 @@ export interface SubscriptionPreviousEventData
 		Partial<Flatten<NonNullable<Subscription['previewTrial']>, 'previous.subscription.previewTrial', true>> {}
 
 export interface SubscriptionEventData extends Partial<SubscriptionCurrentEventData> {
+	/** Promo key (identifier) associated with the upgrade */
+	'subscription.promo.key'?: string;
+	/** Promo discount code associated with the upgrade */
+	'subscription.promo.code'?: string;
 	'subscription.state'?: SubscriptionState;
 	'subscription.stateString'?: SubscriptionStateString;
-	'subscription.status'?: SubscriptionStateString;
 }
 
 type SubscriptionActionEventData =
@@ -778,8 +807,16 @@ type SubscriptionActionEventData =
 				| 'reactivate'
 				| 'resend-verification'
 				| 'pricing'
-				| 'start-preview-trial'
-				| 'upgrade';
+				| 'start-preview-trial';
+	  }
+	| {
+			action: 'upgrade';
+			/** `true` if the user cancels the VS Code prompt to open the browser */
+			aborted: boolean;
+			/** Promo key (identifier) associated with the upgrade */
+			'promo.key'?: string;
+			/** Promo discount code associated with the upgrade */
+			'promo.code'?: string;
 	  }
 	| {
 			action: 'visibility';

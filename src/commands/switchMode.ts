@@ -1,21 +1,20 @@
 import { ConfigurationTarget } from 'vscode';
-import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import { showModePicker } from '../quickpicks/modePicker';
+import { command } from '../system/-webview/command';
+import { configuration } from '../system/-webview/configuration';
 import { log } from '../system/decorators/log';
 import { getLogScope, setLogScopeExit } from '../system/logger.scope';
-import { command } from '../system/vscode/command';
-import { configuration } from '../system/vscode/configuration';
-import { GlCommandBase } from './base';
+import { GlCommandBase } from './commandBase';
 
 @command()
 export class SwitchModeCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super(GlCommand.SwitchMode);
+		super('gitlens.switchMode');
 	}
 
 	@log({ args: false, scoped: true, singleLine: true, timed: false })
-	async execute() {
+	async execute(): Promise<void> {
 		const scope = getLogScope();
 
 		const pick = await showModePicker();
@@ -45,11 +44,11 @@ export class SwitchModeCommand extends GlCommandBase {
 @command()
 export class ToggleReviewModeCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super(GlCommand.ToggleReviewMode);
+		super('gitlens.toggleReviewMode');
 	}
 
 	@log({ args: false, singleLine: true, timed: false })
-	async execute() {
+	async execute(): Promise<void> {
 		const modes = configuration.get('modes');
 		if (modes == null || !Object.keys(modes).includes('review')) return;
 
@@ -61,11 +60,11 @@ export class ToggleReviewModeCommand extends GlCommandBase {
 @command()
 export class ToggleZenModeCommand extends GlCommandBase {
 	constructor(private readonly container: Container) {
-		super(GlCommand.ToggleZenMode);
+		super('gitlens.toggleZenMode');
 	}
 
 	@log({ args: false, singleLine: true, timed: false })
-	async execute() {
+	async execute(): Promise<void> {
 		const modes = configuration.get('modes');
 		if (modes == null || !Object.keys(modes).includes('zen')) return;
 

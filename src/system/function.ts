@@ -7,10 +7,10 @@ export interface Deferrable<T extends (...args: any[]) => any> {
 	pending(): boolean;
 }
 
-interface PropOfValue {
-	(): any;
-	value: string | undefined;
-}
+// interface PropOfValue {
+// 	(): any;
+// 	value: string | undefined;
+// }
 
 export function debounce<T extends (...args: any[]) => ReturnType<T>>(
 	fn: T,
@@ -155,17 +155,17 @@ export function is<T extends object>(o: object, propOrMatcher?: keyof T | ((o: a
 	return value === undefined ? (o as any)[propOrMatcher] !== undefined : (o as any)[propOrMatcher] === value;
 }
 
-export function once<T extends (...args: any[]) => any>(fn: T): T {
+export function once<T extends (...args: any[]) => unknown>(fn: T): T {
 	let result: ReturnType<T>;
 	let called = false;
 
-	return function (this: any, ...args: Parameters<T>): ReturnType<T> {
+	return function (this: unknown, ...args: Parameters<T>): ReturnType<T> {
 		if (!called) {
 			called = true;
-			result = fn.apply(this, args);
+			result = fn.apply(this, args) as ReturnType<T>;
 			fn = undefined!;
 		}
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-return
+
 		return result;
 	} as T;
 }
@@ -187,16 +187,16 @@ export function partial<T extends (...args: any[]) => any, P extends any[]>(
 	return (...rest) => fn(...partialArgs, ...rest);
 }
 
-export function propOf<T, K extends Extract<keyof T, string>>(o: T, key: K) {
-	const propOfCore = <T, K extends Extract<keyof T, string>>(o: T, key: K) => {
-		const value: string =
-			(propOfCore as PropOfValue).value === undefined ? key : `${(propOfCore as PropOfValue).value}.${key}`;
-		(propOfCore as PropOfValue).value = value;
-		const fn = <Y extends Extract<keyof T[K], string>>(k: Y) => propOfCore(o[key], k);
-		return Object.assign(fn, { value: value });
-	};
-	return propOfCore(o, key);
-}
+// export function propOf<T, K extends Extract<keyof T, string>>(o: T, key: K) {
+// 	const propOfCore = <T, K extends Extract<keyof T, string>>(o: T, key: K) => {
+// 		const value: string =
+// 			(propOfCore as PropOfValue).value === undefined ? key : `${(propOfCore as PropOfValue).value}.${key}`;
+// 		(propOfCore as PropOfValue).value = value;
+// 		const fn = <Y extends Extract<keyof T[K], string>>(k: Y) => propOfCore(o[key], k);
+// 		return Object.assign(fn, { value: value });
+// 	};
+// 	return propOfCore(o, key);
+// }
 
 export function disposableInterval(fn: (...args: any[]) => void, ms: number): Disposable {
 	let timer: ReturnType<typeof setInterval> | undefined;
@@ -213,16 +213,32 @@ export function disposableInterval(fn: (...args: any[]) => void, ms: number): Di
 	return disposable;
 }
 
-export async function sequentialize<T extends (...args: any[]) => unknown>(
+export async function runSequentially<T extends (...args: any[]) => unknown>(
 	fn: T,
-	argArray: Parameters<T>[],
+	arrayOfArgs: Parameters<T>[],
 	thisArg?: unknown,
 ): Promise<any> {
-	for (const args of argArray) {
+	for (const args of arrayOfArgs) {
 		try {
 			void (await fn.apply(thisArg, args));
 		} catch {}
 	}
+}
+
+export function sequentialize<T extends (...args: any[]) => Promise<any>>(fn: T): T {
+	let promise: Promise<unknown> | undefined;
+
+	return function (...args: any[]): Promise<any> {
+		// eslint-disable-next-line no-return-await, @typescript-eslint/no-unsafe-return
+		const run = async () => await fn(...args);
+		if (promise == null) {
+			promise = run();
+		} else {
+			promise = promise.then(run, run);
+		}
+
+		return promise;
+	} as T;
 }
 
 /**
@@ -237,7 +253,7 @@ export function throttle<T extends (...args: any[]) => ReturnType<T>>(fn: T, del
 	let waiting = false;
 	let waitingArgs: Parameters<T> | undefined;
 
-	return function (this: unknown, ...args: Parameters<T>) {
+	return function (this: unknown, ...args: Parameters<T>): void {
 		if (waiting) {
 			waitingArgs = args;
 

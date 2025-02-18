@@ -1,7 +1,10 @@
 import type { RemotesConfig } from '../../config';
+import { SelfHostedIntegrationId } from '../../constants.integrations';
 import type { Container } from '../../container';
+import type { ConfiguredIntegrationDescriptor } from '../../plus/integrations/authentication/models';
+import { isCloudSelfHostedIntegrationId } from '../../plus/integrations/providers/models';
+import { configuration } from '../../system/-webview/configuration';
 import { Logger } from '../../system/logger';
-import { configuration } from '../../system/vscode/configuration';
 import { AzureDevOpsRemote } from './azure-devops';
 import { BitbucketRemote } from './bitbucket';
 import { BitbucketServerRemote } from './bitbucket-server';
@@ -73,7 +76,10 @@ const builtInProviders: RemoteProviders = [
 	},
 ];
 
-export function loadRemoteProviders(cfg: RemotesConfig[] | null | undefined): RemoteProviders {
+export function loadRemoteProviders(
+	cfg: RemotesConfig[] | null | undefined,
+	configuredIntegrations?: ConfiguredIntegrationDescriptor[],
+): RemoteProviders {
 	const providers: RemoteProviders = [];
 
 	if (cfg?.length) {
@@ -94,6 +100,31 @@ export function loadRemoteProviders(cfg: RemotesConfig[] | null | undefined): Re
 				matcher: matcher!,
 				creator: providerCreator,
 			});
+		}
+	}
+
+	if (configuredIntegrations?.length) {
+		for (const ci of configuredIntegrations) {
+			if (isCloudSelfHostedIntegrationId(ci.integrationId) && ci.domain) {
+				const matcher = ci.domain.toLocaleLowerCase();
+				const providerCreator = (_container: Container, domain: string, path: string) =>
+					ci.integrationId === SelfHostedIntegrationId.CloudGitHubEnterprise
+						? new GitHubRemote(domain, path)
+						: new GitLabRemote(domain, path);
+				const provider = {
+					custom: false,
+					matcher: matcher,
+					creator: providerCreator,
+				};
+
+				const indexOfCustomDuplication: number = providers.findIndex(p => p.matcher === matcher);
+
+				if (indexOfCustomDuplication !== -1) {
+					providers[indexOfCustomDuplication] = provider;
+				} else {
+					providers.push(provider);
+				}
+			}
 		}
 	}
 
@@ -136,12 +167,15 @@ function getCustomProviderCreator(cfg: RemotesConfig) {
 	}
 }
 
-export function getRemoteProviderMatcher(
+export async function getRemoteProviderMatcher(
 	container: Container,
 	providers?: RemoteProviders,
-): (url: string, domain: string, path: string) => RemoteProvider | undefined {
+): Promise<(url: string, domain: string, path: string) => RemoteProvider | undefined> {
 	if (providers == null) {
-		providers = loadRemoteProviders(configuration.get('remotes', null));
+		providers = loadRemoteProviders(
+			configuration.get('remotes', null),
+			await container.integrations.getConfigured(),
+		);
 	}
 
 	return (url: string, domain: string, path: string) =>

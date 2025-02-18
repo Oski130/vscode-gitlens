@@ -1,12 +1,17 @@
 import { QuickInputButtons } from 'vscode';
 import type { Container } from '../../container';
-import { addAssociatedIssueToBranch, getNameWithoutRemote } from '../../git/models/branch.utils';
 import type { IssueShape } from '../../git/models/issue';
 import type { GitBranchReference, GitReference } from '../../git/models/reference';
-import { getReferenceLabel, isBranchReference, isRevisionReference } from '../../git/models/reference.utils';
 import { Repository } from '../../git/models/repository';
 import type { GitWorktree } from '../../git/models/worktree';
-import { getWorktreesByBranch } from '../../git/models/worktree.utils';
+import { addAssociatedIssueToBranch } from '../../git/utils/-webview/branch.issue.utils';
+import { getWorktreesByBranch } from '../../git/utils/-webview/worktree.utils';
+import {
+	getReferenceLabel,
+	getReferenceNameWithoutRemote,
+	isBranchReference,
+	isRevisionReference,
+} from '../../git/utils/reference.utils';
 import { showGenericErrorMessage } from '../../messages';
 import { getIssueOwner } from '../../plus/integrations/providers/utils';
 import type { QuickPickItemOfT } from '../../quickpicks/items/common';
@@ -226,7 +231,7 @@ export class BranchGitCommand extends QuickCommand {
 			: super.canSkipConfirm;
 	}
 
-	override get skipConfirmKey() {
+	override get skipConfirmKey(): string {
 		return `${this.key}${this.subcommand == null ? '' : `-${this.subcommand}`}:${this.pickedVia}`;
 	}
 
@@ -361,8 +366,8 @@ export class BranchGitCommand extends QuickCommand {
 		while (this.canStepsContinue(state)) {
 			if (state.counter < 3 || state.reference == null) {
 				const result = yield* pickBranchOrTagStep(state, context, {
-					placeholder: `Select a base to create the new branch from`,
-					picked: state.reference?.ref ?? (await state.repo.git.getBranch())?.ref,
+					placeholder: `Choose a base to create the new branch from`,
+					picked: state.reference?.ref ?? (await state.repo.git.branches().getBranch())?.ref,
 					title: 'Select Base to Create Branch From',
 					value: isRevisionReference(state.reference) ? state.reference.ref : undefined,
 				});
@@ -374,7 +379,7 @@ export class BranchGitCommand extends QuickCommand {
 
 			if (state.counter < 4 || state.name == null || state.suggestNameOnly) {
 				const result = yield* inputBranchNameStep(state, context, {
-					titleContext: ` from ${getReferenceLabel(state.reference, {
+					title: `${context.title} from ${getReferenceLabel(state.reference, {
 						capitalize: true,
 						icon: false,
 						label: state.reference.refType !== 'branch',
@@ -382,7 +387,7 @@ export class BranchGitCommand extends QuickCommand {
 					value:
 						state.name ?? // if it's a remote branch, pre-fill the name
 						(isBranchReference(state.reference) && state.reference.remote
-							? getNameWithoutRemote(state.reference)
+							? getReferenceNameWithoutRemote(state.reference)
 							: undefined),
 				});
 				if (result === StepResultBreak) continue;
@@ -423,7 +428,7 @@ export class BranchGitCommand extends QuickCommand {
 				await state.repo.switch(state.reference.ref, { createBranch: state.name });
 			} else {
 				try {
-					await state.repo.git.createBranch(state.name, state.reference.ref);
+					await state.repo.git.branches().createBranch?.(state.name, state.reference.ref);
 				} catch (ex) {
 					Logger.error(ex);
 					// TODO likely need some better error handling here
@@ -433,7 +438,7 @@ export class BranchGitCommand extends QuickCommand {
 
 			if (state.associateWithIssue != null) {
 				const issue = state.associateWithIssue;
-				const branch = await state.repo.git.getBranch(state.name);
+				const branch = await state.repo.git.branches().getBranch(state.name);
 				// TODO: These descriptors are hacked in. Use an integration function to get the right resource for the issue.
 				const owner = getIssueOwner(issue);
 				if (branch != null && owner != null) {
@@ -660,7 +665,7 @@ export class BranchGitCommand extends QuickCommand {
 
 			if (state.counter < 4 || state.name == null) {
 				const result = yield* inputBranchNameStep(state, context, {
-					titleContext: ` ${getReferenceLabel(state.reference, false)}`,
+					title: `${context.title} ${getReferenceLabel(state.reference, false)}`,
 					value: state.name ?? state.reference.name,
 				});
 				if (result === StepResultBreak) continue;
@@ -675,7 +680,7 @@ export class BranchGitCommand extends QuickCommand {
 
 			endSteps(state);
 			try {
-				await state.repo.git.renameBranch(state.reference.ref, state.name);
+				await state.repo.git.branches().renameBranch?.(state.reference.ref, state.name);
 			} catch (ex) {
 				Logger.error(ex);
 				// TODO likely need some better error handling here

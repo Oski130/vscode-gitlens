@@ -1,6 +1,6 @@
 import type { TimeInput } from '@opentelemetry/api';
 import type { Config } from '../config';
-import type { Commands } from '../constants.commands';
+import type { GlCommands } from '../constants.commands';
 import type { Source, TelemetryEvents, TelemetryEventsFromWebviewApp } from '../constants.telemetry';
 import type {
 	CustomEditorIds,
@@ -10,7 +10,8 @@ import type {
 	WebviewViewIds,
 	WebviewViewTypes,
 } from '../constants.views';
-import type { ConfigPath, ConfigPathValue, Path, PathValue } from '../system/vscode/configuration';
+import type { Promo, PromoLocation } from '../plus/gk/models/promo';
+import type { ConfigPath, ConfigPathValue, Path, PathValue } from '../system/-webview/configuration';
 
 export type IpcScope = 'core' | CustomEditorTypes | WebviewTypes | WebviewViewTypes;
 
@@ -80,10 +81,21 @@ export interface WebviewFocusChangedParams {
 export const WebviewFocusChangedCommand = new IpcCommand<WebviewFocusChangedParams>('core', 'webview/focus/changed');
 
 export interface ExecuteCommandParams {
-	command: Commands;
+	command: GlCommands;
 	args?: [];
 }
 export const ExecuteCommand = new IpcCommand<ExecuteCommandParams>('core', 'command/execute');
+
+export interface ApplicablePromoRequestParams {
+	location?: PromoLocation;
+}
+export interface ApplicablePromoResponse {
+	promo: Promo | undefined;
+}
+export const ApplicablePromoRequest = new IpcRequest<ApplicablePromoRequestParams, ApplicablePromoResponse>(
+	'core',
+	'promos/applicable',
+);
 
 export interface UpdateConfigurationParams {
 	changes: {

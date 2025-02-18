@@ -2,8 +2,8 @@ import { MarkdownString, ThemeIcon, TreeItem, TreeItemCollapsibleState } from 'v
 import { GlyphChars } from '../../constants';
 import { GitUri } from '../../git/gitUri';
 import type { GitRemote } from '../../git/models/remote';
-import { getRemoteUpstreamDescription } from '../../git/models/remote';
 import type { Repository } from '../../git/models/repository';
+import { getRemoteUpstreamDescription } from '../../git/utils/remote.utils';
 import { makeHierarchical } from '../../system/array';
 import { log } from '../../system/decorators/log';
 import type { ViewsWithRemotes } from '../viewBase';
@@ -40,7 +40,7 @@ export class RemoteNode extends ViewNode<'remote', ViewsWithRemotes> {
 	}
 
 	async getChildren(): Promise<ViewNode[]> {
-		const branches = await this.repo.git.getBranches({
+		const branches = await this.repo.git.branches().getBranches({
 			// only show remote branches for this remote
 			filter: b => b.remote && b.name.startsWith(this.remote.name),
 			sort: true,
@@ -142,7 +142,7 @@ export class RemoteNode extends ViewNode<'remote', ViewsWithRemotes> {
 	}
 
 	@log()
-	async setAsDefault(state: boolean = true) {
+	async setAsDefault(state: boolean = true): Promise<void> {
 		await this.remote.setAsDefault(state);
 		void this.triggerChange();
 	}

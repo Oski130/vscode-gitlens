@@ -8,27 +8,28 @@ import type { Container } from '../../container';
 import type { GitUri } from '../../git/gitUri';
 import { unknownGitUri } from '../../git/gitUri';
 import type { GitBranch } from '../../git/models/branch';
-import { getTargetBranchName } from '../../git/models/branch.utils';
 import { isStash } from '../../git/models/commit';
 import type { GitLog } from '../../git/models/log';
 import type { PullRequest, PullRequestState } from '../../git/models/pullRequest';
 import type { GitBranchReference } from '../../git/models/reference';
-import { getHighlanderProviders } from '../../git/models/remote';
-import { Repository } from '../../git/models/repository';
+import type { Repository } from '../../git/models/repository';
 import type { GitUser } from '../../git/models/user';
 import type { GitWorktree } from '../../git/models/worktree';
-import { getBranchIconPath, getRemoteIconPath, getWorktreeBranchIconPath } from '../../git/utils/icons';
+import { getTargetBranchName } from '../../git/utils/-webview/branch.utils';
+import { getBranchIconPath, getRemoteIconPath, getWorktreeBranchIconPath } from '../../git/utils/-webview/icons';
+import { getLastFetchedUpdateInterval } from '../../git/utils/fetch.utils';
+import { getHighlanderProviders } from '../../git/utils/remote.utils';
+import { getContext } from '../../system/-webview/context';
 import { fromNow } from '../../system/date';
-import { gate } from '../../system/decorators/gate';
+import { gate } from '../../system/decorators/-webview/gate';
+import { memoize } from '../../system/decorators/-webview/memoize';
 import { log } from '../../system/decorators/log';
-import { memoize } from '../../system/decorators/memoize';
 import { weakEvent } from '../../system/event';
 import { disposableInterval } from '../../system/function';
 import { map } from '../../system/iterable';
 import type { Deferred } from '../../system/promise';
 import { defer, getSettledValue } from '../../system/promise';
 import { pad } from '../../system/string';
-import { getContext } from '../../system/vscode/context';
 import type { View, ViewsWithBranches } from '../viewBase';
 import { disposeChildren } from '../viewBase';
 import { createViewDecorationUri } from '../viewDecorationProvider';
@@ -41,9 +42,8 @@ import { CommitNode } from './commitNode';
 import { LoadMoreNode, MessageNode } from './common';
 import { CompareBranchNode } from './compareBranchNode';
 import { insertDateMarkers } from './helpers';
-import { MergeStatusNode } from './mergeStatusNode';
+import { PausedOperationStatusNode } from './pausedOperationStatusNode';
 import { PullRequestNode } from './pullRequestNode';
-import { RebaseStatusNode } from './rebaseStatusNode';
 import { StashNode } from './stashNode';
 
 type State = {
@@ -105,7 +105,7 @@ export class BranchNode
 		};
 	}
 
-	override dispose() {
+	override dispose(): void {
 		super.dispose();
 		this.children = undefined;
 	}
@@ -224,8 +224,7 @@ export class BranchNode
 				logResult,
 				getBranchAndTagTipsResult,
 				statusResult,
-				mergeStatusResult,
-				rebaseStatusResult,
+				pausedOpStatusResult,
 				unpublishedCommitsResult,
 				baseResult,
 				targetResult,
@@ -233,25 +232,24 @@ export class BranchNode
 				this.getLog(),
 				this.view.container.git.getBranchesAndTagsTipsLookup(this.uri.repoPath, branch.name),
 				this.options.showStatus && branch.current
-					? this.view.container.git.getStatus(this.uri.repoPath)
+					? this.view.container.git.status(this.uri.repoPath!).getStatus()
 					: undefined,
 				this.options.showStatus && branch.current
-					? this.view.container.git.getMergeStatus(this.uri.repoPath!)
+					? this.view.container.git.status(this.uri.repoPath!).getPausedOperationStatus?.()
 					: undefined,
-				this.options.showStatus ? this.view.container.git.getRebaseStatus(this.uri.repoPath!) : undefined,
 				!branch.remote
-					? this.view.container.git.getBranchAheadRange(branch).then(range =>
-							range
-								? this.view.container.git.getLogRefsOnly(this.uri.repoPath!, {
-										limit: 0,
-										ref: range,
-										merges: this.options.showMergeCommits,
-								  })
-								: undefined,
-					  )
+					? this.view.container.git
+							.getBranchAheadRange(branch)
+							.then(range =>
+								range
+									? this.view.container.git
+											.commits(this.uri.repoPath!)
+											.getLogShasOnly(range, { limit: 0, merges: this.options.showMergeCommits })
+									: undefined,
+							)
 					: undefined,
 				loadComparisonDefaultCompareWith
-					? this.view.container.git.getBaseBranchName(this.branch.repoPath, this.branch.name)
+					? this.view.container.git.branches(this.branch.repoPath).getBaseBranchName?.(this.branch.name)
 					: undefined,
 				loadComparisonDefaultCompareWith
 					? getTargetBranchName(this.view.container, this.branch, {
@@ -266,37 +264,21 @@ export class BranchNode
 			const children = [];
 
 			const status = getSettledValue(statusResult);
-			const mergeStatus = getSettledValue(mergeStatusResult);
-			const rebaseStatus = getSettledValue(rebaseStatusResult);
+			const pausedOpsStatus = getSettledValue(pausedOpStatusResult);
 			const unpublishedCommits = getSettledValue(unpublishedCommitsResult);
 
 			if (pullRequest != null) {
 				children.push(new PullRequestNode(this.view, this, pullRequest, branch));
 			}
 
-			if (this.options.showStatus && mergeStatus != null) {
+			if (pausedOpsStatus != null) {
 				children.push(
-					new MergeStatusNode(
+					new PausedOperationStatusNode(
 						this.view,
 						this,
 						branch,
-						mergeStatus,
-						status ?? (await this.view.container.git.getStatus(this.uri.repoPath)),
-						this.root,
-					),
-				);
-			} else if (
-				this.options.showStatus &&
-				rebaseStatus != null &&
-				(branch.current || branch.name === rebaseStatus.incoming.name)
-			) {
-				children.push(
-					new RebaseStatusNode(
-						this.view,
-						this,
-						branch,
-						rebaseStatus,
-						status ?? (await this.view.container.git.getStatus(this.uri.repoPath)),
+						pausedOpsStatus,
+						status ?? (await this.view.container.git.status(this.uri.repoPath!).getStatus()),
 						this.root,
 					),
 				);
@@ -408,7 +390,7 @@ export class BranchNode
 			if (log.hasMore) {
 				children.push(
 					new LoadMoreNode(this.view, this, children[children.length - 1], {
-						getCount: () => this.view.container.git.getCommitCount(branch.repoPath, branch.name),
+						getCount: () => this.view.container.git.commits(branch.repoPath).getCommitCount(branch.name),
 					}),
 				);
 			}
@@ -454,18 +436,18 @@ export class BranchNode
 	}
 
 	@log()
-	async star() {
+	async star(): Promise<void> {
 		await this.branch.star();
 		void this.view.refresh(true);
 	}
 
 	@log()
-	async unstar() {
+	async unstar(): Promise<void> {
 		await this.branch.unstar();
 		void this.view.refresh(true);
 	}
 
-	override refresh(reset?: boolean) {
+	override refresh(reset?: boolean): void {
 		void super.refresh?.(reset);
 
 		this.children = undefined;
@@ -510,9 +492,8 @@ export class BranchNode
 				limit = Math.min(this.branch.state.ahead + 1, limit * 2);
 			}
 
-			this._log = await this.view.container.git.getLog(this.uri.repoPath!, {
+			this._log = await this.view.container.git.commits(this.uri.repoPath!).getLog(this.ref.ref, {
 				limit: limit,
-				ref: this.ref.ref,
 				authors: this.options?.authors,
 				merges: this.options?.showMergeCommits,
 				stashes: this.options?.showStashes,
@@ -522,12 +503,12 @@ export class BranchNode
 		return this._log;
 	}
 
-	get hasMore() {
+	get hasMore(): boolean {
 		return this._log?.hasMore ?? true;
 	}
 
 	@gate()
-	async loadMore(limit?: number | { until?: any }) {
+	async loadMore(limit?: number | { until?: any }): Promise<void> {
 		let log = await window.withProgress(
 			{
 				location: { viewId: this.view.id },
@@ -697,7 +678,9 @@ export async function getBranchNodeParts(
 					break;
 			}
 		} else {
-			const providers = getHighlanderProviders(await container.git.getRemotesWithProviders(branch.repoPath));
+			const providers = getHighlanderProviders(
+				await container.git.remotes(branch.repoPath).getRemotesWithProviders(),
+			);
 			const providerName = providers?.length ? providers[0].name : undefined;
 
 			tooltip += `\n\nLocal branch, hasn't been published to ${providerName ?? 'a remote'}`;
@@ -737,7 +720,7 @@ export async function getBranchNodeParts(
 	let localUnpublished = false;
 	if (status === 'local') {
 		// If there are any remotes then say this is unpublished, otherwise local
-		const remotes = await container.git.getRemotes(branch.repoPath);
+		const remotes = await container.git.remotes(branch.repoPath).getRemotes();
 		if (remotes.length) {
 			localUnpublished = true;
 		}
@@ -817,10 +800,10 @@ export class CommitsCurrentBranchNode extends SubscribeableViewNode<'commits-cur
 		return this.branch.upstream?.missing || this.branch.detached ? undefined : this.repo?.getLastFetched();
 	}
 
-	protected async subscribe() {
+	protected async subscribe(): Promise<Disposable | undefined> {
 		const lastFetched = (await this.getLastFetched()) ?? 0;
 
-		const interval = Repository.getLastFetchedUpdateInterval(lastFetched);
+		const interval = getLastFetchedUpdateInterval(lastFetched);
 		if (lastFetched !== 0 && interval > 0) {
 			return Disposable.from(
 				this.repo != null
@@ -828,7 +811,7 @@ export class CommitsCurrentBranchNode extends SubscribeableViewNode<'commits-cur
 					: emptyDisposable,
 				disposableInterval(() => {
 					// Check if the interval should change, and if so, reset it
-					if (interval !== Repository.getLastFetchedUpdateInterval(lastFetched)) {
+					if (interval !== getLastFetchedUpdateInterval(lastFetched)) {
 						void this.resetSubscription();
 					}
 

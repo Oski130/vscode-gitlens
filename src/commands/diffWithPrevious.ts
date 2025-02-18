@@ -5,11 +5,12 @@ import { GitUri } from '../git/gitUri';
 import type { GitCommit } from '../git/models/commit';
 import { deletedOrMissing } from '../git/models/revision';
 import { showCommitHasNoPreviousCommitWarningMessage, showGenericErrorMessage } from '../messages';
+import { command, executeCommand } from '../system/-webview/command';
+import { findOrOpenEditor } from '../system/-webview/vscode';
 import { Logger } from '../system/logger';
-import { command, executeCommand } from '../system/vscode/command';
-import { findOrOpenEditor } from '../system/vscode/utils';
-import type { CommandContext } from './base';
-import { ActiveEditorCommand, getCommandUri } from './base';
+import { ActiveEditorCommand } from './commandBase';
+import { getCommandUri } from './commandBase.utils';
+import type { CommandContext } from './commandContext';
 import type { DiffWithCommandArgs } from './diffWith';
 
 export interface DiffWithPreviousCommandArgs {
@@ -25,21 +26,21 @@ export interface DiffWithPreviousCommandArgs {
 export class DiffWithPreviousCommand extends ActiveEditorCommand {
 	constructor(private readonly container: Container) {
 		super([
-			GlCommand.DiffWithPrevious,
-			GlCommand.DiffWithPreviousInDiffLeft,
-			GlCommand.DiffWithPreviousInDiffRight,
+			'gitlens.diffWithPrevious',
+			'gitlens.diffWithPreviousInDiffLeft',
+			'gitlens.diffWithPreviousInDiffRight',
 		]);
 	}
 
-	protected override preExecute(context: CommandContext, args?: DiffWithPreviousCommandArgs) {
-		if (context.command === GlCommand.DiffWithPreviousInDiffRight) {
+	protected override preExecute(context: CommandContext, args?: DiffWithPreviousCommandArgs): Promise<void> {
+		if (context.command === 'gitlens.diffWithPreviousInDiffRight') {
 			args = { ...args, inDiffRightEditor: true };
 		}
 
 		return this.execute(context.editor, context.uri, args);
 	}
 
-	async execute(editor?: TextEditor, uri?: Uri, args?: DiffWithPreviousCommandArgs) {
+	async execute(editor?: TextEditor, uri?: Uri, args?: DiffWithPreviousCommandArgs): Promise<void> {
 		args = { ...args };
 		if (args.uri == null) {
 			uri = getCommandUri(uri, editor);
@@ -84,8 +85,7 @@ export class DiffWithPreviousCommand extends ActiveEditorCommand {
 		// }
 
 		try {
-			const diffUris = await this.container.git.getPreviousComparisonUris(
-				gitUri.repoPath!,
+			const diffUris = await this.container.git.diff(gitUri.repoPath!).getPreviousComparisonUris(
 				gitUri,
 				gitUri.sha,
 				// If we are in the right-side of the diff editor, we need to skip back 1 more revision

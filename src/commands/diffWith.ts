@@ -6,14 +6,14 @@ import type { Container } from '../container';
 import type { GitCommit } from '../git/models/commit';
 import { isCommit } from '../git/models/commit';
 import { deletedOrMissing } from '../git/models/revision';
-import { isShaLike, isUncommitted, shortenRevision } from '../git/models/revision.utils';
+import { isShaLike, isUncommitted, shortenRevision } from '../git/utils/revision.utils';
 import { showGenericErrorMessage } from '../messages';
+import { command } from '../system/-webview/command';
+import { openDiffEditor } from '../system/-webview/vscode';
 import { createMarkdownCommandLink } from '../system/commands';
 import { Logger } from '../system/logger';
 import { basename } from '../system/path';
-import { command } from '../system/vscode/command';
-import { openDiffEditor } from '../system/vscode/utils';
-import { GlCommandBase } from './base';
+import { GlCommandBase } from './commandBase';
 
 export interface DiffWithCommandArgsRevision {
 	sha: string;
@@ -99,11 +99,11 @@ export class DiffWithCommand extends GlCommandBase {
 			let rhsSha = args.rhs.sha;
 
 			[args.lhs.sha, args.rhs.sha] = await Promise.all([
-				await this.container.git.resolveReference(args.repoPath, args.lhs.sha, args.lhs.uri, {
+				await this.container.git.refs(args.repoPath).resolveReference(args.lhs.sha, args.lhs.uri, {
 					// If the ref looks like a sha, don't wait too long, since it should work
 					timeout: isShaLike(args.lhs.sha) ? 100 : undefined,
 				}),
-				await this.container.git.resolveReference(args.repoPath, args.rhs.sha, args.rhs.uri, {
+				await this.container.git.refs(args.repoPath).resolveReference(args.rhs.sha, args.rhs.uri, {
 					// If the ref looks like a sha, don't wait too long, since it should work
 					timeout: isShaLike(args.rhs.sha) ? 100 : undefined,
 				}),
@@ -115,11 +115,9 @@ export class DiffWithCommand extends GlCommandBase {
 
 			if (args.rhs.sha && args.rhs.sha !== deletedOrMissing) {
 				// Ensure that the file still exists in this commit
-				const status = await this.container.git.getFileStatusForCommit(
-					args.repoPath,
-					args.rhs.uri,
-					args.rhs.sha,
-				);
+				const status = await this.container.git
+					.commits(args.repoPath)
+					.getCommitFileStatus(args.rhs.uri, args.rhs.sha);
 				if (status?.status === 'D') {
 					args.rhs.sha = deletedOrMissing;
 				} else {

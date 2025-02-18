@@ -3,10 +3,11 @@ import { GlCommand } from '../constants.commands';
 import type { Container } from '../container';
 import { showGenericErrorMessage } from '../messages';
 import { getBestRepositoryOrShowPicker } from '../quickpicks/repositoryPicker';
+import { command } from '../system/-webview/command';
 import { Logger } from '../system/logger';
-import { command } from '../system/vscode/command';
-import type { CommandContext } from './base';
-import { ActiveEditorCommand, getCommandUri } from './base';
+import { ActiveEditorCommand } from './commandBase';
+import { getCommandUri } from './commandBase.utils';
+import type { CommandContext } from './commandContext';
 
 export interface CompareWithCommandArgs {
 	ref1?: string;
@@ -20,25 +21,25 @@ export class CompareWithCommand extends ActiveEditorCommand {
 			GlCommand.CompareWith,
 			GlCommand.CompareHeadWith,
 			GlCommand.CompareWorkingWith,
-			GlCommand.Deprecated_DiffHeadWith,
-			GlCommand.Deprecated_DiffWorkingWith,
+			/** @deprecated */ 'gitlens.diffHeadWith',
+			/** @deprecated */ 'gitlens.diffWorkingWith',
 		]);
 	}
 
-	protected override preExecute(context: CommandContext, args?: CompareWithCommandArgs) {
+	protected override preExecute(context: CommandContext, args?: CompareWithCommandArgs): Promise<void> {
 		switch (context.command) {
 			case GlCommand.CompareWith:
 				args = { ...args };
 				break;
 
 			case GlCommand.CompareHeadWith:
-			case GlCommand.Deprecated_DiffHeadWith:
+			case /** @deprecated */ 'gitlens.diffHeadWith':
 				args = { ...args };
 				args.ref1 = 'HEAD';
 				break;
 
 			case GlCommand.CompareWorkingWith:
-			case GlCommand.Deprecated_DiffWorkingWith:
+			case /** @deprecated */ 'gitlens.diffWorkingWith':
 				args = { ...args };
 				args.ref1 = '';
 				break;
@@ -47,7 +48,7 @@ export class CompareWithCommand extends ActiveEditorCommand {
 		return this.execute(context.editor, context.uri, args);
 	}
 
-	async execute(editor?: TextEditor, uri?: Uri, args?: CompareWithCommandArgs) {
+	async execute(editor?: TextEditor, uri?: Uri, args?: CompareWithCommandArgs): Promise<void> {
 		uri = getCommandUri(uri, editor);
 		args = { ...args };
 
